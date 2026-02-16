@@ -41,7 +41,8 @@ const maxPositiveScore =
     BLS_TO_EXECUTION_CHANGE_WEIGHT +
     EXECUTION_PAYLOAD_WEIGHT +
     PAYLOAD_ATTESTATION_WEIGHT +
-    EXECUTION_PAYLOAD_BID_WEIGHT);
+    EXECUTION_PAYLOAD_BID_WEIGHT +
+    PROPOSER_PREFERENCES_WEIGHT);
 
 /**
  * The following params is implemented by Lighthouse at

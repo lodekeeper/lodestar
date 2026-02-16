@@ -5,10 +5,16 @@ import {computeSigningRoot} from "../util/index.js";
 
 export function getProposerPreferencesSigningRoot(
   config: BeaconConfig,
-  stateSlot: Slot,
+  _stateSlot: Slot,
   proposerPreferences: gloas.ProposerPreferences
 ): Uint8Array {
-  const domain = config.getDomain(stateSlot, DOMAIN_PROPOSER_PREFERENCES, proposerPreferences.proposalSlot);
+  // Use proposalSlot for both domain slot and message slot to ensure correct fork version
+  // at the Gloas fork boundary (when validating at epoch N-1 for proposals in epoch N)
+  const domain = config.getDomain(
+    proposerPreferences.proposalSlot,
+    DOMAIN_PROPOSER_PREFERENCES,
+    proposerPreferences.proposalSlot
+  );
 
   return computeSigningRoot(ssz.gloas.ProposerPreferences, proposerPreferences, domain);
 }
