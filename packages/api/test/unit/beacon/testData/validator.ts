@@ -112,6 +112,10 @@ export const testData: GenericServerTestCases<Endpoints> = {
     args: {proposers: [{validatorIndex: 1, feeRecipient: "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b"}]},
     res: undefined,
   },
+  submitProposerPreferences: {
+    args: {proposerPreferences: [ssz.gloas.SignedProposerPreferences.defaultValue()]},
+    res: undefined,
+  },
   submitBeaconCommitteeSelections: {
     args: {selections: []},
     res: {data: [{validatorIndex: 1, slot: 2, selectionProof}]},

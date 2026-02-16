@@ -73,6 +73,7 @@ import {BlockType, ProduceFullDeneb} from "../../../chain/produceBlock/index.js"
 import {RegenCaller} from "../../../chain/regen/index.js";
 import {CheckpointHex} from "../../../chain/stateCache/types.js";
 import {validateApiAggregateAndProof} from "../../../chain/validation/index.js";
+import {validateApiProposerPreferences} from "../../../chain/validation/proposerPreferences.js";
 import {validateSyncCommitteeGossipContributionAndProof} from "../../../chain/validation/syncCommitteeContributionAndProof.js";
 import {ZERO_HASH} from "../../../constants/index.js";
 import {BuilderStatus, NoBidReceived} from "../../../execution/builder/http.js";
@@ -1467,6 +1468,34 @@ export function getValidatorApi(
 
     async prepareBeaconProposer({proposers}) {
       await chain.updateBeaconProposerData(chain.clock.currentEpoch, proposers);
+    },
+
+    async submitProposerPreferences({proposerPreferences}) {
+      const failures: FailureList = [];
+
+      await Promise.all(
+        proposerPreferences.map(async (signedProposerPreferences, i) => {
+          try {
+            await validateApiProposerPreferences(chain, signedProposerPreferences);
+
+            const insertOutcome = chain.proposerPreferencesPool.add(signedProposerPreferences);
+            metrics?.opPool.proposerPreferencesPool.apiInsertOutcome.inc({insertOutcome});
+
+            const {proposalSlot, validatorIndex} = signedProposerPreferences.message;
+            chain.seenProposerPreferences.add(proposalSlot, validatorIndex);
+            chain.emitter.emit(routes.events.EventType.proposerPreferences, signedProposerPreferences);
+
+            await network.publishProposerPreferences(signedProposerPreferences);
+          } catch (e) {
+            failures.push({index: i, message: (e as Error).message});
+            logger.verbose(`Error on submitProposerPreferences [${i}]`, {}, e as Error);
+          }
+        })
+      );
+
+      if (failures.length > 0) {
+        throw new IndexedError("Error processing proposer preferences", failures);
+      }
     },
 
     async submitBeaconCommitteeSelections() {

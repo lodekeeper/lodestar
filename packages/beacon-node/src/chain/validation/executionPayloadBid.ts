@@ -7,7 +7,7 @@ import {
   isActiveBuilder,
 } from "@lodestar/state-transition";
 import {gloas} from "@lodestar/types";
-import {toRootHex} from "@lodestar/utils";
+import {toHex, toRootHex} from "@lodestar/utils";
 import {ExecutionPayloadBidError, ExecutionPayloadBidErrorCode, GossipAction} from "../errors/index.js";
 import {IBeaconChain} from "../index.js";
 import {RegenCaller} from "../regen/index.js";
@@ -47,9 +47,14 @@ async function validateExecutionPayloadBid(
     });
   }
 
-  // [IGNORE] the `SignedProposerPreferences` where `preferences.proposal_slot`
-  // is equal to `bid.slot` has been seen.
-  // TODO GLOAS: Implement this along with proposer preference
+  // [IGNORE] proposer preferences for this slot has been seen.
+  const signedPreferences = chain.proposerPreferencesPool.get(bid.slot);
+  if (signedPreferences === null) {
+    throw new ExecutionPayloadBidError(GossipAction.IGNORE, {
+      code: ExecutionPayloadBidErrorCode.PREFERENCES_NOT_SEEN,
+      slot: bid.slot,
+    });
+  }
 
   // [REJECT] `bid.builder_index` is a valid/active builder index -- i.e.
   // `is_active_builder(state, bid.builder_index)` returns `True`.
@@ -70,11 +75,18 @@ async function validateExecutionPayloadBid(
     });
   }
 
-  // [REJECT] `bid.fee_recipient` matches the `fee_recipient` from the proposer's
-  // `SignedProposerPreferences` associated with `bid.slot`.
-  // [REJECT] `bid.gas_limit` matches the `gas_limit` from the proposer's
-  // `SignedProposerPreferences` associated with `bid.slot`.
-  // TODO GLOAS: Implement this along with proposer preference
+  // [REJECT] bid fee recipient and gas limit must match proposer preferences.
+  const preferences = signedPreferences.message;
+  if (toHex(bid.feeRecipient) !== toHex(preferences.feeRecipient) || bid.gasLimit !== BigInt(preferences.gasLimit)) {
+    throw new ExecutionPayloadBidError(GossipAction.REJECT, {
+      code: ExecutionPayloadBidErrorCode.PREFERENCES_MISMATCH,
+      slot: bid.slot,
+      bidFeeRecipient: toHex(bid.feeRecipient),
+      expectedFeeRecipient: toHex(preferences.feeRecipient),
+      bidGasLimit: bid.gasLimit,
+      expectedGasLimit: preferences.gasLimit,
+    });
+  }
 
   // [IGNORE] this is the first signed bid seen with a valid signature from the given builder for this slot.
   if (chain.seenExecutionPayloadBids.isKnown(bid.slot, bid.builderIndex)) {

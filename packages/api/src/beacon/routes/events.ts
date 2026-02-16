@@ -15,6 +15,7 @@ import {
   altair,
   capella,
   electra,
+  gloas,
   phase0,
   ssz,
   sszTypesFor,
@@ -88,6 +89,8 @@ export enum EventType {
   blobSidecar = "blob_sidecar",
   /** The node has received a valid DataColumnSidecar (from P2P or API) */
   dataColumnSidecar = "data_column_sidecar",
+  /** The node has received valid SignedProposerPreferences (from P2P or API) */
+  proposerPreferences = "proposer_preferences",
 }
 
 export const eventTypes: {[K in EventType]: K} = {
@@ -108,6 +111,7 @@ export const eventTypes: {[K in EventType]: K} = {
   [EventType.payloadAttributes]: EventType.payloadAttributes,
   [EventType.blobSidecar]: EventType.blobSidecar,
   [EventType.dataColumnSidecar]: EventType.dataColumnSidecar,
+  [EventType.proposerPreferences]: EventType.proposerPreferences,
 };
 
 export type EventData = {
@@ -157,6 +161,7 @@ export type EventData = {
   [EventType.payloadAttributes]: {version: ForkName; data: SSEPayloadAttributes};
   [EventType.blobSidecar]: BlobSidecarSSE;
   [EventType.dataColumnSidecar]: DataColumnSidecarSSE;
+  [EventType.proposerPreferences]: gloas.SignedProposerPreferences;
 };
 
 export type BeaconEvent = {[K in EventType]: {type: K; message: EventData[K]}}[EventType];
@@ -311,6 +316,7 @@ export function getTypeByEvent(config: ChainForkConfig): {[K in EventType]: Type
     [EventType.payloadAttributes]: WithVersion((fork) => getPostBellatrixForkTypes(fork).SSEPayloadAttributes),
     [EventType.blobSidecar]: blobSidecarSSE,
     [EventType.dataColumnSidecar]: dataColumnSidecarSSE,
+    [EventType.proposerPreferences]: ssz.gloas.SignedProposerPreferences,
 
     [EventType.lightClientOptimisticUpdate]: WithVersion(
       (fork) => getPostAltairForkTypes(fork).LightClientOptimisticUpdate

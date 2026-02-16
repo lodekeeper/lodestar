@@ -1181,6 +1181,22 @@ export function createLodestarMetrics(
           labelNames: ["insertOutcome"],
         }),
       },
+      proposerPreferencesPool: {
+        size: register.gauge({
+          name: "lodestar_oppool_proposer_preferences_pool_size",
+          help: "Current size of the ProposerPreferencesPool = total number of preferences",
+        }),
+        gossipInsertOutcome: register.counter<{insertOutcome: InsertOutcome}>({
+          name: "lodestar_oppool_proposer_preferences_pool_gossip_insert_outcome_total",
+          help: "Total number of InsertOutcome as a result of adding proposer preferences from gossip to the pool",
+          labelNames: ["insertOutcome"],
+        }),
+        apiInsertOutcome: register.counter<{insertOutcome: InsertOutcome}>({
+          name: "lodestar_oppool_proposer_preferences_pool_api_insert_outcome_total",
+          help: "Total number of InsertOutcome as a result of adding proposer preferences from api to the pool",
+          labelNames: ["insertOutcome"],
+        }),
+      },
     },
 
     chain: {

@@ -51,6 +51,7 @@ import {
   ExecutionPayloadBidPool,
   OpPool,
   PayloadAttestationPool,
+  ProposerPreferencesPool,
   SyncCommitteeMessagePool,
   SyncContributionAndProofPool,
 } from "./opPools/index.js";
@@ -66,6 +67,7 @@ import {
   SeenExecutionPayloadBids,
   SeenExecutionPayloadEnvelopes,
   SeenPayloadAttesters,
+  SeenProposerPreferences,
   SeenSyncCommitteeMessages,
 } from "./seenCache/index.js";
 import {SeenAggregatedAttestations} from "./seenCache/seenAggregateAndProof.js";
@@ -128,6 +130,7 @@ export interface IBeaconChain {
   readonly syncContributionAndProofPool: SyncContributionAndProofPool;
   readonly executionPayloadBidPool: ExecutionPayloadBidPool;
   readonly payloadAttestationPool: PayloadAttestationPool;
+  readonly proposerPreferencesPool: ProposerPreferencesPool;
   readonly opPool: OpPool;
 
   // Gossip seen cache
@@ -137,6 +140,7 @@ export interface IBeaconChain {
   readonly seenAggregatedAttestations: SeenAggregatedAttestations;
   readonly seenExecutionPayloadEnvelopes: SeenExecutionPayloadEnvelopes;
   readonly seenExecutionPayloadBids: SeenExecutionPayloadBids;
+  readonly seenProposerPreferences: SeenProposerPreferences;
   readonly seenBlockProposers: SeenBlockProposers;
   readonly seenSyncCommitteeMessages: SeenSyncCommitteeMessages;
   readonly seenContributionAndProof: SeenContributionAndProof;

@@ -34,6 +34,7 @@ const AttestationListTypeElectra = ArrayOf(ssz.electra.Attestation);
 const AttesterSlashingListTypePhase0 = ArrayOf(ssz.phase0.AttesterSlashing);
 const AttesterSlashingListTypeElectra = ArrayOf(ssz.electra.AttesterSlashing);
 const ProposerSlashingListType = ArrayOf(ssz.phase0.ProposerSlashing);
+const SignedProposerPreferencesListType = ArrayOf(ssz.gloas.SignedProposerPreferences);
 const SignedVoluntaryExitListType = ArrayOf(ssz.phase0.SignedVoluntaryExit);
 const SignedBLSToExecutionChangeListType = ArrayOf(ssz.capella.SignedBLSToExecutionChange);
 const SyncCommitteeMessageListType = ArrayOf(ssz.altair.SyncCommitteeMessage);
@@ -47,6 +48,7 @@ type AttesterSlashingListElectra = ValueOf<typeof AttesterSlashingListTypeElectr
 type AttesterSlashingList = AttesterSlashingListPhase0 | AttesterSlashingListElectra;
 
 type ProposerSlashingList = ValueOf<typeof ProposerSlashingListType>;
+type SignedProposerPreferencesList = ValueOf<typeof SignedProposerPreferencesListType>;
 type SignedVoluntaryExitList = ValueOf<typeof SignedVoluntaryExitListType>;
 type SignedBLSToExecutionChangeList = ValueOf<typeof SignedBLSToExecutionChangeListType>;
 type SyncCommitteeMessageList = ValueOf<typeof SyncCommitteeMessageListType>;
@@ -112,6 +114,18 @@ export type Endpoints = {
     EmptyArgs,
     EmptyRequest,
     ProposerSlashingList,
+    EmptyMeta
+  >;
+
+  /**
+   * Get ProposerPreferences from operations pool
+   * Retrieves proposer preferences known by the node but not necessarily incorporated into gossip handling logic yet.
+   */
+  getPoolProposerPreferences: Endpoint<
+    "GET",
+    {slot?: Slot},
+    {query: {slot?: number}},
+    SignedProposerPreferencesList,
     EmptyMeta
   >;
 
@@ -300,6 +314,19 @@ export function getDefinitions(config: ChainForkConfig): RouteDefinitions<Endpoi
       req: EmptyRequestCodec,
       resp: {
         data: ProposerSlashingListType,
+        meta: EmptyMetaCodec,
+      },
+    },
+    getPoolProposerPreferences: {
+      url: "/eth/v1/beacon/pool/proposer_preferences",
+      method: "GET",
+      req: {
+        writeReq: ({slot}) => ({query: {slot}}),
+        parseReq: ({query}) => ({slot: query.slot}),
+        schema: {query: {slot: Schema.Uint}},
+      },
+      resp: {
+        data: SignedProposerPreferencesListType,
         meta: EmptyMetaCodec,
       },
     },

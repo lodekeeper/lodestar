@@ -27,6 +27,7 @@ const BLS_TO_EXECUTION_CHANGE_WEIGHT = 0.05;
 const EXECUTION_PAYLOAD_WEIGHT = 0.5;
 const PAYLOAD_ATTESTATION_WEIGHT = 0.05;
 const EXECUTION_PAYLOAD_BID_WEIGHT = 0.05;
+const PROPOSER_PREFERENCES_WEIGHT = 0.05;
 
 const beaconAttestationSubnetWeight = 1 / ATTESTATION_SUBNET_COUNT;
 const maxPositiveScore =
@@ -195,6 +196,16 @@ function getAllTopicsScoreParams(
       })
     ] = getTopicScoreParams(config, precomputedParams, {
       topicWeight: EXECUTION_PAYLOAD_BID_WEIGHT,
+      expectedMessageRate: 1024, // TODO GLOAS: Need an estimate for this
+      firstMessageDecayTime: epochDurationMs * 100,
+    });
+    topicsParams[
+      stringifyGossipTopic(config, {
+        type: GossipType.proposer_preferences,
+        boundary,
+      })
+    ] = getTopicScoreParams(config, precomputedParams, {
+      topicWeight: PROPOSER_PREFERENCES_WEIGHT,
       expectedMessageRate: 1024, // TODO GLOAS: Need an estimate for this
       firstMessageDecayTime: epochDurationMs * 100,
     });

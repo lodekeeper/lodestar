@@ -220,6 +220,7 @@ export const SignedValidatorRegistrationV1ListType = ArrayOf(
   ssz.bellatrix.SignedValidatorRegistrationV1,
   VALIDATOR_REGISTRY_LIMIT
 );
+export const SignedProposerPreferencesListType = ArrayOf(ssz.gloas.SignedProposerPreferences);
 
 export type ValidatorIndices = ValueOf<typeof ValidatorIndicesType>;
 export type AttesterDuty = ValueOf<typeof AttesterDutyType>;
@@ -245,6 +246,7 @@ export type SyncCommitteeSelectionList = ValueOf<typeof SyncCommitteeSelectionLi
 export type LivenessResponseData = ValueOf<typeof LivenessResponseDataType>;
 export type LivenessResponseDataList = ValueOf<typeof LivenessResponseDataListType>;
 export type SignedValidatorRegistrationV1List = ValueOf<typeof SignedValidatorRegistrationV1ListType>;
+export type SignedProposerPreferencesList = ValueOf<typeof SignedProposerPreferencesListType>;
 
 export type Endpoints = {
   /**
@@ -485,6 +487,14 @@ export type Endpoints = {
   prepareBeaconProposer: Endpoint<
     "POST",
     {proposers: ProposerPreparationDataList},
+    {body: unknown},
+    EmptyResponseData,
+    EmptyMeta
+  >;
+
+  submitProposerPreferences: Endpoint<
+    "POST",
+    {proposerPreferences: SignedProposerPreferencesList},
     {body: unknown},
     EmptyResponseData,
     EmptyMeta
@@ -974,6 +984,18 @@ export function getDefinitions(config: ChainForkConfig): RouteDefinitions<Endpoi
       req: JsonOnlyReq({
         writeReqJson: ({proposers}) => ({body: ProposerPreparationDataListType.toJson(proposers)}),
         parseReqJson: ({body}) => ({proposers: ProposerPreparationDataListType.fromJson(body)}),
+        schema: {body: Schema.ObjectArray},
+      }),
+      resp: EmptyResponseCodec,
+    },
+    submitProposerPreferences: {
+      url: "/eth/v1/validator/proposer_preferences",
+      method: "POST",
+      req: JsonOnlyReq({
+        writeReqJson: ({proposerPreferences}) => ({
+          body: SignedProposerPreferencesListType.toJson(proposerPreferences),
+        }),
+        parseReqJson: ({body}) => ({proposerPreferences: SignedProposerPreferencesListType.fromJson(body)}),
         schema: {body: Schema.ObjectArray},
       }),
       resp: EmptyResponseCodec,

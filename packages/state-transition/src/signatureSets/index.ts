@@ -19,6 +19,7 @@ export * from "./executionPayloadEnvelope.js";
 export * from "./indexedAttestation.js";
 export * from "./indexedPayloadAttestation.js";
 export * from "./proposer.js";
+export * from "./proposerPreferences.js";
 export * from "./proposerSlashings.js";
 export * from "./randao.js";
 export * from "./voluntaryExits.js";

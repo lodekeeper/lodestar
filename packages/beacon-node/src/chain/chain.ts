@@ -82,6 +82,7 @@ import {
   ExecutionPayloadBidPool,
   OpPool,
   PayloadAttestationPool,
+  ProposerPreferencesPool,
   SyncCommitteeMessagePool,
   SyncContributionAndProofPool,
 } from "./opPools/index.js";
@@ -100,6 +101,7 @@ import {
   SeenExecutionPayloadBids,
   SeenExecutionPayloadEnvelopes,
   SeenPayloadAttesters,
+  SeenProposerPreferences,
   SeenSyncCommitteeMessages,
 } from "./seenCache/index.js";
 import {SeenAggregatedAttestations} from "./seenCache/seenAggregateAndProof.js";
@@ -164,6 +166,7 @@ export class BeaconChain implements IBeaconChain {
   readonly syncContributionAndProofPool;
   readonly executionPayloadBidPool: ExecutionPayloadBidPool;
   readonly payloadAttestationPool: PayloadAttestationPool;
+  readonly proposerPreferencesPool: ProposerPreferencesPool;
   readonly opPool: OpPool;
 
   // Gossip seen cache
@@ -173,6 +176,7 @@ export class BeaconChain implements IBeaconChain {
   readonly seenAggregatedAttestations: SeenAggregatedAttestations;
   readonly seenExecutionPayloadEnvelopes = new SeenExecutionPayloadEnvelopes();
   readonly seenExecutionPayloadBids = new SeenExecutionPayloadBids();
+  readonly seenProposerPreferences = new SeenProposerPreferences();
   readonly seenBlockProposers = new SeenBlockProposers();
   readonly seenSyncCommitteeMessages = new SeenSyncCommitteeMessages();
   readonly seenContributionAndProof: SeenContributionAndProof;
@@ -291,6 +295,7 @@ export class BeaconChain implements IBeaconChain {
     this.syncContributionAndProofPool = new SyncContributionAndProofPool(config, clock, metrics, logger);
     this.executionPayloadBidPool = new ExecutionPayloadBidPool();
     this.payloadAttestationPool = new PayloadAttestationPool(config, clock, metrics);
+    this.proposerPreferencesPool = new ProposerPreferencesPool();
     this.opPool = new OpPool(config);
 
     this.seenAggregatedAttestations = new SeenAggregatedAttestations(metrics);
@@ -1270,6 +1275,7 @@ export class BeaconChain implements IBeaconChain {
     metrics.opPool.syncCommitteeMessagePoolSize.set(this.syncCommitteeMessagePool.size);
     metrics.opPool.payloadAttestationPool.size.set(this.payloadAttestationPool.size);
     metrics.opPool.executionPayloadBidPool.size.set(this.executionPayloadBidPool.size);
+    metrics.opPool.proposerPreferencesPool.size.set(this.proposerPreferencesPool.size);
     // syncContributionAndProofPool tracks metrics on its own
     metrics.opPool.blsToExecutionChangePoolSize.set(this.opPool.blsToExecutionChangeSize);
     metrics.chain.blacklistedBlocks.set(this.blacklistedBlocks.size);
@@ -1302,7 +1308,9 @@ export class BeaconChain implements IBeaconChain {
     this.seenSyncCommitteeMessages.prune(slot);
     this.payloadAttestationPool.prune(slot);
     this.executionPayloadBidPool.prune(slot);
+    this.proposerPreferencesPool.prune(slot);
     this.seenExecutionPayloadBids.prune(slot);
+    this.seenProposerPreferences.prune(slot);
     this.seenAttestationDatas.onSlot(slot);
     this.reprocessController.onSlot(slot);
 

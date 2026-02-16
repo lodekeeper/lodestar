@@ -10,6 +10,8 @@ export enum ExecutionPayloadBidErrorCode {
   UNKNOWN_BLOCK_ROOT = "EXECUTION_PAYLOAD_BID_ERROR_UNKNOWN_BLOCK_ROOT",
   INVALID_SLOT = "EXECUTION_PAYLOAD_BID_ERROR_INVALID_SLOT",
   INVALID_SIGNATURE = "EXECUTION_PAYLOAD_BID_ERROR_INVALID_SIGNATURE",
+  PREFERENCES_NOT_SEEN = "EXECUTION_PAYLOAD_BID_ERROR_PREFERENCES_NOT_SEEN",
+  PREFERENCES_MISMATCH = "EXECUTION_PAYLOAD_BID_ERROR_PREFERENCES_MISMATCH",
 }
 
 export type ExecutionPayloadBidErrorType =
@@ -30,6 +32,15 @@ export type ExecutionPayloadBidErrorType =
   | {code: ExecutionPayloadBidErrorCode.BID_TOO_HIGH; bidValue: number; builderBalance: number}
   | {code: ExecutionPayloadBidErrorCode.UNKNOWN_BLOCK_ROOT; parentBlockRoot: RootHex}
   | {code: ExecutionPayloadBidErrorCode.INVALID_SLOT; builderIndex: BuilderIndex; slot: Slot}
-  | {code: ExecutionPayloadBidErrorCode.INVALID_SIGNATURE; builderIndex: BuilderIndex; slot: Slot};
+  | {code: ExecutionPayloadBidErrorCode.INVALID_SIGNATURE; builderIndex: BuilderIndex; slot: Slot}
+  | {code: ExecutionPayloadBidErrorCode.PREFERENCES_NOT_SEEN; slot: Slot}
+  | {
+      code: ExecutionPayloadBidErrorCode.PREFERENCES_MISMATCH;
+      slot: Slot;
+      bidFeeRecipient: string;
+      expectedFeeRecipient: string;
+      bidGasLimit: bigint;
+      expectedGasLimit: number;
+    };
 
 export class ExecutionPayloadBidError extends GossipActionError<ExecutionPayloadBidErrorType> {}

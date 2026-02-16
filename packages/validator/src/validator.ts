@@ -15,6 +15,7 @@ import {ValidatorEventEmitter} from "./services/emitter.js";
 import {ExternalSignerOptions, pollExternalSignerPubkeys} from "./services/externalSignerSync.js";
 import {IndicesService} from "./services/indices.js";
 import {pollBuilderValidatorRegistration, pollPrepareBeaconProposer} from "./services/prepareBeaconProposer.js";
+import {pollProposerPreferences} from "./services/proposerPreferences.js";
 import {SyncCommitteeService} from "./services/syncCommittee.js";
 import {SyncingStatusTracker} from "./services/syncingStatusTracker.js";
 import {Signer, ValidatorProposerConfig, ValidatorStore, defaultOptions} from "./services/validatorStore.js";
@@ -214,6 +215,7 @@ export class Validator {
     );
     pollPrepareBeaconProposer(config, loggerVc, api, clock, validatorStore, metrics);
     pollBuilderValidatorRegistration(config, loggerVc, api, clock, validatorStore, metrics);
+    pollProposerPreferences(config, loggerVc, api, clock, validatorStore, metrics);
     pollExternalSignerPubkeys(config, loggerVc, controller.signal, validatorStore, opts.externalSigner);
 
     const emitter = new ValidatorEventEmitter();

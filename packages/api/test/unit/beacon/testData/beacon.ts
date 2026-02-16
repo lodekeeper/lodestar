@@ -128,6 +128,10 @@ export const testData: GenericServerTestCases<Endpoints> = {
     args: undefined,
     res: {data: [ssz.phase0.ProposerSlashing.defaultValue()]},
   },
+  getPoolProposerPreferences: {
+    args: {slot: 1},
+    res: {data: [ssz.gloas.SignedProposerPreferences.defaultValue()]},
+  },
   getPoolVoluntaryExits: {
     args: undefined,
     res: {data: [ssz.phase0.SignedVoluntaryExit.defaultValue()]},

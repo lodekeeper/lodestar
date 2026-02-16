@@ -8,6 +8,7 @@ import {
   DOMAIN_BEACON_ATTESTER,
   DOMAIN_BEACON_PROPOSER,
   DOMAIN_CONTRIBUTION_AND_PROOF,
+  DOMAIN_PROPOSER_PREFERENCES,
   DOMAIN_RANDAO,
   DOMAIN_SELECTION_PROOF,
   DOMAIN_SYNC_COMMITTEE,
@@ -39,6 +40,7 @@ import {
   ValidatorIndex,
   altair,
   bellatrix,
+  gloas,
   phase0,
   ssz,
 } from "@lodestar/types";
@@ -722,6 +724,25 @@ export class ValidatorStore {
     return {
       message: validatorRegistration,
       signature: await this.getSignature(pubkeyMaybeHex, signingRoot, signingSlot, signableMessage),
+    };
+  }
+
+  async signProposerPreferences(
+    pubkey: BLSPubkeyMaybeHex,
+    proposerPreferences: gloas.ProposerPreferences
+  ): Promise<gloas.SignedProposerPreferences> {
+    const signingSlot = proposerPreferences.proposalSlot;
+    const domain = this.config.getDomain(signingSlot, DOMAIN_PROPOSER_PREFERENCES, signingSlot);
+    const signingRoot = computeSigningRoot(ssz.gloas.ProposerPreferences, proposerPreferences, domain);
+
+    const signableMessage: SignableMessage = {
+      type: SignableMessageType.PROPOSER_PREFERENCES,
+      data: proposerPreferences,
+    };
+
+    return {
+      message: proposerPreferences,
+      signature: await this.getSignature(pubkey, signingRoot, signingSlot, signableMessage),
     };
   }
 

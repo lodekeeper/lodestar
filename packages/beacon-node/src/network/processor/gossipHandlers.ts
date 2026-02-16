@@ -67,6 +67,7 @@ import {
 import {validateLightClientFinalityUpdate} from "../../chain/validation/lightClientFinalityUpdate.js";
 import {validateLightClientOptimisticUpdate} from "../../chain/validation/lightClientOptimisticUpdate.js";
 import {validateGossipPayloadAttestationMessage} from "../../chain/validation/payloadAttestationMessage.js";
+import {validateGossipProposerPreferences} from "../../chain/validation/proposerPreferences.js";
 import {OpSource} from "../../chain/validatorMonitor.js";
 import {Metrics} from "../../metrics/index.js";
 import {kzgCommitmentToVersionedHash} from "../../util/blobs.js";
@@ -862,6 +863,25 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
       } catch (e) {
         logger.error("Error adding to executionPayloadBid pool", {}, e as Error);
       }
+    },
+    [GossipType.proposer_preferences]: async ({
+      gossipData,
+      topic,
+    }: GossipHandlerParamGeneric<GossipType.proposer_preferences>) => {
+      const {serializedData} = gossipData;
+      const proposerPreferences = sszDeserialize(topic, serializedData);
+      await validateGossipProposerPreferences(chain, proposerPreferences);
+
+      try {
+        const insertOutcome = chain.proposerPreferencesPool.add(proposerPreferences);
+        metrics?.opPool.proposerPreferencesPool.gossipInsertOutcome.inc({insertOutcome});
+        const {proposalSlot, validatorIndex} = proposerPreferences.message;
+        chain.seenProposerPreferences.add(proposalSlot, validatorIndex);
+      } catch (e) {
+        logger.error("Error adding to proposerPreferences pool", {}, e as Error);
+      }
+
+      chain.emitter.emit(routes.events.EventType.proposerPreferences, proposerPreferences);
     },
   };
 }

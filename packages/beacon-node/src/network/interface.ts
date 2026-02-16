@@ -31,6 +31,7 @@ import {
   capella,
   deneb,
   fulu,
+  gloas,
   phase0,
 } from "@lodestar/types";
 import {BlockInputSource} from "../chain/blocks/blockInput/types.js";
@@ -90,6 +91,7 @@ export interface INetwork extends INetworkCorePublic {
   publishVoluntaryExit(voluntaryExit: phase0.SignedVoluntaryExit): Promise<number>;
   publishBlsToExecutionChange(blsToExecutionChange: capella.SignedBLSToExecutionChange): Promise<number>;
   publishProposerSlashing(proposerSlashing: phase0.ProposerSlashing): Promise<number>;
+  publishProposerPreferences(signedPreferences: gloas.SignedProposerPreferences): Promise<number>;
   publishAttesterSlashing(attesterSlashing: AttesterSlashing): Promise<number>;
   publishSyncCommitteeSignature(signature: altair.SyncCommitteeMessage, subnet: SubnetID): Promise<number>;
   publishContributionAndProof(contributionAndProof: altair.SignedContributionAndProof): Promise<number>;

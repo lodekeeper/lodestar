@@ -83,6 +83,10 @@ export function getBeaconPoolApi({
       return {data: chain.opPool.getAllProposerSlashings()};
     },
 
+    async getPoolProposerPreferences({slot}) {
+      return {data: chain.proposerPreferencesPool.getAll({slot})};
+    },
+
     async getPoolVoluntaryExits() {
       return {data: chain.opPool.getAllVoluntaryExits()};
     },

@@ -11,6 +11,7 @@ import {
   RootHex,
   Slot,
   altair,
+  gloas,
   phase0,
   ssz,
   sszTypesFor,
@@ -32,6 +33,7 @@ export enum SignableMessageType {
   SYNC_COMMITTEE_SELECTION_PROOF = "SYNC_COMMITTEE_SELECTION_PROOF",
   SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF",
   VALIDATOR_REGISTRATION = "VALIDATOR_REGISTRATION",
+  PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES",
 }
 
 const AggregationSlotType = new ContainerType({
@@ -80,7 +82,8 @@ export type SignableMessage =
   | {type: SignableMessageType.SYNC_COMMITTEE_MESSAGE; data: ValueOf<typeof SyncCommitteeMessageType>}
   | {type: SignableMessageType.SYNC_COMMITTEE_SELECTION_PROOF; data: ValueOf<typeof SyncAggregatorSelectionDataType>}
   | {type: SignableMessageType.SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF; data: altair.ContributionAndProof}
-  | {type: SignableMessageType.VALIDATOR_REGISTRATION; data: ValidatorRegistrationV1};
+  | {type: SignableMessageType.VALIDATOR_REGISTRATION; data: ValidatorRegistrationV1}
+  | {type: SignableMessageType.PROPOSER_PREFERENCES; data: gloas.ProposerPreferences};
 
 const requiresForkInfo: Record<SignableMessageType, boolean> = {
   [SignableMessageType.AGGREGATION_SLOT]: true,
@@ -95,6 +98,7 @@ const requiresForkInfo: Record<SignableMessageType, boolean> = {
   [SignableMessageType.SYNC_COMMITTEE_SELECTION_PROOF]: true,
   [SignableMessageType.SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF]: true,
   [SignableMessageType.VALIDATOR_REGISTRATION]: false,
+  [SignableMessageType.PROPOSER_PREFERENCES]: true,
 };
 
 type Web3SignerSerializedRequest = {
@@ -266,6 +270,9 @@ function serializerSignableMessagePayload(config: BeaconConfig, payload: Signabl
 
     case SignableMessageType.VALIDATOR_REGISTRATION:
       return {validator_registration: ssz.bellatrix.ValidatorRegistrationV1.toJson(payload.data)};
+
+    case SignableMessageType.PROPOSER_PREFERENCES:
+      return {proposer_preferences: ssz.gloas.ProposerPreferences.toJson(payload.data)};
   }
 }
 

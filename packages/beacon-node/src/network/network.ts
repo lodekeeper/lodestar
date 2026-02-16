@@ -24,6 +24,7 @@ import {
   capella,
   deneb,
   fulu,
+  gloas,
   phase0,
 } from "@lodestar/types";
 import {prettyPrintIndices, sleep} from "@lodestar/utils";
@@ -432,6 +433,16 @@ export class Network implements INetwork {
     return this.publishGossip<GossipType.proposer_slashing>(
       {type: GossipType.proposer_slashing, boundary},
       proposerSlashing
+    );
+  }
+
+  async publishProposerPreferences(signedPreferences: gloas.SignedProposerPreferences): Promise<number> {
+    const epoch = computeEpochAtSlot(signedPreferences.message.proposalSlot);
+    const boundary = this.config.getForkBoundaryAtEpoch(epoch);
+
+    return this.publishGossip<GossipType.proposer_preferences>(
+      {type: GossipType.proposer_preferences, boundary},
+      signedPreferences
     );
   }
 
