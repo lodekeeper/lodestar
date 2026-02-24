@@ -934,21 +934,33 @@ export class BeaconChain implements IBeaconChain {
   }> {
     const fork = this.config.getForkName(slot);
 
-    // For Gloas: produce on the PENDING (default) parent variant.
+    // For Gloas: force the PENDING variant of the parent block for production.
     //
-    // findHead() returns PENDING by default for Gloas. We intentionally keep it.
-    // Using the FULL parent would set bid.parentBlockHash to the parent's envelope
-    // execution hash, but remote verifiers may not have the parent envelope yet
-    // (e.g., LH during lookup/sync without envelope reqresp). Those verifiers would
-    // see a ParentBlockHashMismatch since their state.latestBlockHash is still from
-    // the previous FULL slot.
+    // The parent block may be FULL (envelope imported via gossip), but its state
+    // includes post-envelope execution data that remote verifiers (e.g., LH) may
+    // not have yet. Producing on the FULL variant sets bid.parentBlockHash to the
+    // envelope's execution hash, which causes ParentBlockHashMismatch on verifiers
+    // whose state.latestBlockHash is still the PENDING hash.
     //
-    // Producing on PENDING ensures bid.parentBlockHash equals the universally-known
-    // latestBlockHash (from the last processed envelope), making the block verifiable
-    // by all nodes regardless of parent envelope availability.
+    // Forcing the PENDING variant ensures:
+    //   1. getBlockSlotState retrieves the pre-envelope state
+    //   2. bid.parentBlockHash = universally-known latestBlockHash
+    //   3. The block is verifiable by ALL nodes regardless of envelope availability
     //
-    // Note: getHeadExecutionBlockHash() is also patched to not prefer FULL sibling,
-    // so the FCU parent hash stays consistent with the PENDING production path.
+    // The PENDING variant always exists alongside FULL in fork-choice.
+    if (isForkPostGloas(fork) && parentBlock.payloadStatus !== PayloadStatus.PENDING) {
+      const pendingParent = this.forkChoice.getBlockHex(parentBlock.blockRoot, PayloadStatus.PENDING);
+      if (pendingParent !== null) {
+        this.logger.debug("Forced PENDING parent variant for Gloas block production", {
+          parentRoot: parentBlock.blockRoot,
+          parentSlot: parentBlock.slot,
+          originalStatus: parentBlock.payloadStatus,
+          pendingExecHash: pendingParent.executionPayloadBlockHash ?? "null",
+          fullExecHash: parentBlock.executionPayloadBlockHash ?? "null",
+        });
+        parentBlock = pendingParent;
+      }
+    }
 
     const state = await this.regen.getBlockSlotState(
       parentBlock,

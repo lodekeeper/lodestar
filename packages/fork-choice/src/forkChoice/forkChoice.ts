@@ -218,15 +218,28 @@ export class ForkChoice implements IForkChoice {
   getHeadExecutionBlockHash(): RootHex | null {
     const head = this.head;
 
-    // Return the head variant's execution hash directly, without preferring
-    // the FULL sibling. This ensures the FCU parent hash matches the PENDING
-    // production path: proposers build on the universally-known latestBlockHash
-    // rather than the FULL variant's envelope hash (which remote verifiers may
-    // not have yet).
+    // For Gloas heads: always use the PENDING variant's execution hash.
     //
-    // For FULL heads: returns the concrete payload hash (correct).
-    // For PENDING/EMPTY heads: returns the inherited parent execution hash,
-    // which is the latestBlockHash from the last processed envelope.
+    // The head may be FULL (envelope imported via gossip), but its
+    // executionPayloadBlockHash is the envelope's execution hash — which
+    // remote verifiers (e.g., LH) may not have received yet. Those
+    // verifiers' state.latestBlockHash still equals the PENDING variant's
+    // inherited parent execution hash.
+    //
+    // Using the PENDING variant's hash for FCU ensures:
+    //   1. The EL builds the next payload on the universally-known parent
+    //   2. The produced block's bid.parentBlockHash matches what ALL verifiers
+    //      expect, regardless of whether they've imported the parent envelope
+    //
+    // The PENDING variant always exists alongside FULL in fork-choice.
+    // Only applies to Gloas blocks (which have PendingEnvelope execution status)
+    if (head.executionStatus === ExecutionStatus.PendingEnvelope || head.payloadStatus !== undefined) {
+      const pendingBlock = this.getBlockHex(head.blockRoot, PayloadStatus.PENDING);
+      if (pendingBlock !== null) {
+        return pendingBlock.executionPayloadBlockHash;
+      }
+    }
+
     return head.executionPayloadBlockHash;
   }
 
