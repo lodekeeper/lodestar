@@ -218,18 +218,15 @@ export class ForkChoice implements IForkChoice {
   getHeadExecutionBlockHash(): RootHex | null {
     const head = this.head;
 
-    // FULL already has the concrete payload hash for this block
-    if (head.payloadStatus === PayloadStatus.FULL) {
-      return head.executionPayloadBlockHash;
-    }
-
-    // PENDING / EMPTY: prefer FULL sibling variant when available
-    const fullBlock = this.getBlockHex(head.blockRoot, PayloadStatus.FULL);
-    if (fullBlock !== null && fullBlock.executionPayloadBlockHash !== null) {
-      return fullBlock.executionPayloadBlockHash;
-    }
-
-    // No FULL variant yet: fall back to current head variant hash (parent execution hash)
+    // Return the head variant's execution hash directly, without preferring
+    // the FULL sibling. This ensures the FCU parent hash matches the PENDING
+    // production path: proposers build on the universally-known latestBlockHash
+    // rather than the FULL variant's envelope hash (which remote verifiers may
+    // not have yet).
+    //
+    // For FULL heads: returns the concrete payload hash (correct).
+    // For PENDING/EMPTY heads: returns the inherited parent execution hash,
+    // which is the latestBlockHash from the last processed envelope.
     return head.executionPayloadBlockHash;
   }
 

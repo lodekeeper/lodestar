@@ -934,73 +934,21 @@ export class BeaconChain implements IBeaconChain {
   }> {
     const fork = this.config.getForkName(slot);
 
-    // For Gloas blocks: import parent's pending envelope before state retrieval.
-    // Without this, block production uses the EMPTY parent state, producing a block
-    // with a state root that won't match the FULL-parent verification path.
-    if (isForkPostGloas(fork) && parentBlock.payloadStatus !== PayloadStatus.FULL) {
-      const parentRootHex = parentBlock.blockRoot;
-      // Check pendingEnvelopes first (envelope arrived before block was in fork-choice)
-      const pendingEnvelope = this.pendingEnvelopes.get(parentRootHex);
-      if (pendingEnvelope) {
-        try {
-          await this.importExecutionPayloadEnvelope(pendingEnvelope);
-          this.pendingEnvelopes.delete(parentRootHex);
-          // Refresh parentBlock to FULL variant so getBlockSlotState uses post-envelope state.
-          // Without this, parentBlock retains the PENDING stateRoot and production computes
-          // against pre-envelope state, while verification uses the FULL variant's post-envelope
-          // state — causing BLOCK_ERROR_INVALID_STATE_ROOT on publish.
-          const updatedParent = this.forkChoice.getBlockHex(parentRootHex, PayloadStatus.FULL);
-          if (updatedParent) {
-            parentBlock = updatedParent;
-          }
-          this.logger.info("Imported pending parent envelope before block production", {
-            parentRoot: parentRootHex,
-            parentSlot: parentBlock.slot,
-            productionSlot: slot,
-          });
-        } catch (e) {
-          this.logger.debug(
-            "Failed importing pending parent envelope before production",
-            {parentRoot: parentRootHex},
-            e as Error
-          );
-        }
-      } else {
-        // Wait briefly for envelope to arrive via gossip
-        for (let attempt = 0; attempt < 20; attempt++) {
-          const updatedParent = this.forkChoice.getBlockHex(parentRootHex, PayloadStatus.FULL);
-          if (updatedParent) {
-            // Refresh parentBlock reference so getBlockSlotState uses FULL state
-            parentBlock = updatedParent;
-            break;
-          }
-          const envelope = this.pendingEnvelopes.get(parentRootHex);
-          if (envelope) {
-            try {
-              await this.importExecutionPayloadEnvelope(envelope);
-              this.pendingEnvelopes.delete(parentRootHex);
-              // Refresh parentBlock to FULL variant after envelope import
-              const freshParent = this.forkChoice.getBlockHex(parentRootHex, PayloadStatus.FULL);
-              if (freshParent) {
-                parentBlock = freshParent;
-              }
-              this.logger.info("Imported pending parent envelope before block production (retry)", {
-                parentRoot: parentRootHex,
-                attempt,
-              });
-            } catch (e) {
-              this.logger.debug(
-                "Failed importing pending parent envelope before production (retry)",
-                {parentRoot: parentRootHex},
-                e as Error
-              );
-            }
-            break;
-          }
-          await sleep(100);
-        }
-      }
-    }
+    // For Gloas: produce on the PENDING (default) parent variant.
+    //
+    // findHead() returns PENDING by default for Gloas. We intentionally keep it.
+    // Using the FULL parent would set bid.parentBlockHash to the parent's envelope
+    // execution hash, but remote verifiers may not have the parent envelope yet
+    // (e.g., LH during lookup/sync without envelope reqresp). Those verifiers would
+    // see a ParentBlockHashMismatch since their state.latestBlockHash is still from
+    // the previous FULL slot.
+    //
+    // Producing on PENDING ensures bid.parentBlockHash equals the universally-known
+    // latestBlockHash (from the last processed envelope), making the block verifiable
+    // by all nodes regardless of parent envelope availability.
+    //
+    // Note: getHeadExecutionBlockHash() is also patched to not prefer FULL sibling,
+    // so the FCU parent hash stays consistent with the PENDING production path.
 
     const state = await this.regen.getBlockSlotState(
       parentBlock,
