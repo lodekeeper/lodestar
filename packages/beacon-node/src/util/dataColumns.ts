@@ -29,7 +29,7 @@ import {
   isGloasDataColumnSidecar,
   ssz,
 } from "@lodestar/types";
-import {bytesToBigInt, toHex} from "@lodestar/utils";
+import {bytesToBigInt} from "@lodestar/utils";
 import {BlockInputColumns} from "../chain/blocks/blockInput/blockInput.js";
 import {BlockInputSource} from "../chain/blocks/blockInput/types.js";
 import {ChainEvent, ChainEventEmitter} from "../chain/emitter.js";
@@ -389,14 +389,6 @@ export function getDataColumnSidecarBlockRoot(sidecar: DataColumnSidecar): Root 
   }
 
   return ssz.phase0.BeaconBlockHeader.hashTreeRoot(sidecar.signedBlockHeader.message);
-}
-
-export function getDataColumnSidecarKzgCommitmentsHex(sidecar: DataColumnSidecar): string[] {
-  if (isGloasDataColumnSidecar(sidecar)) {
-    return [];
-  }
-
-  return sidecar.kzgCommitments.map(toHex);
 }
 
 /**

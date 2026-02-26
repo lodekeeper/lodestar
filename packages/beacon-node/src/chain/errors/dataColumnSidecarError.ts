@@ -20,8 +20,6 @@ export enum DataColumnSidecarErrorCode {
   INCORRECT_BLOCK = "DATA_COLUMN_SIDECAR_ERROR_INCORRECT_BLOCK",
   /** Sidecar cell count not as expected */
   INCORRECT_CELL_COUNT = "DATA_COLUMN_SIDECAR_ERROR_INCORRECT_CELL_COUNT",
-  /** Sidecars in the same batch are mixed fork types (Fulu/Gloas) */
-  MISMATCHED_SIDECAR_TYPE = "DATA_COLUMN_SIDECAR_ERROR_MISMATCHED_SIDECAR_TYPE",
   /** Sidecar kzg proof count not as expected */
   INCORRECT_KZG_COMMITMENTS_COUNT = "DATA_COLUMN_SIDECAR_ERROR_INCORRECT_KZG_COMMITMENTS_COUNT",
   /** Sidecar kzg proof count not as expected */
@@ -84,12 +82,6 @@ export type DataColumnSidecarErrorType =
     }
   | {
       code: DataColumnSidecarErrorCode.INCORRECT_HEADER_ROOT;
-      slot: number;
-      expected: string;
-      actual: string;
-    }
-  | {
-      code: DataColumnSidecarErrorCode.MISMATCHED_SIDECAR_TYPE;
       slot: number;
       expected: string;
       actual: string;

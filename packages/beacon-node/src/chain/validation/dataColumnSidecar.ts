@@ -243,13 +243,13 @@ async function validateGossipDataColumnSidecarGloas(
   gossipSubnet: SubnetID,
   metrics: Metrics | null
 ): Promise<void> {
-  // SPEC FUNCTION
+  // validate_data_column_sidecar
   // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/gloas/p2p-interface.md
   const blockRoot = getDataColumnSidecarBlockRoot(dataColumnSidecar);
   const blockRootHex = toRootHex(blockRoot);
   const slot = getDataColumnSidecarSlot(dataColumnSidecar);
 
-  // 1) [IGNORE] Sidecar block must be known from cache or DB.
+  // [IGNORE] The sidecar's block must be known
   const cachedBlockInput = chain.seenBlockInputCache.get(blockRootHex);
   const blockData = cachedBlockInput?.hasBlock()
     ? cachedBlockInput.getBlock()
@@ -273,12 +273,12 @@ async function validateGossipDataColumnSidecarGloas(
     });
   }
 
-  // 2) [REJECT] Sidecar must pass verify_data_column_sidecar against block commitments.
+  // [REJECT] The sidecar must pass verify_data_column_sidecar against the block commitments
   const kzgCommitments = (blockData as gloas.SignedBeaconBlock).message.body.signedExecutionPayloadBid.message
     .blobKzgCommitments;
   verifyDataColumnSidecarGloas(dataColumnSidecar, kzgCommitments);
 
-  // 3) [REJECT] Sidecar must be on the correct subnet.
+  // [REJECT] The sidecar must be on the correct subnet
   if (computeSubnetForDataColumnSidecar(chain.config, dataColumnSidecar) !== gossipSubnet) {
     throw new DataColumnSidecarGossipError(GossipAction.REJECT, {
       code: DataColumnSidecarErrorCode.INVALID_SUBNET,
@@ -287,8 +287,8 @@ async function validateGossipDataColumnSidecarGloas(
     });
   }
 
+  // [REJECT] The sidecar kzg proofs must verify
   const kzgProofTimer = metrics?.peerDas.dataColumnSidecarKzgProofsVerificationTime.startTimer();
-  // 4) [REJECT] Sidecar kzg proofs must verify.
   try {
     await verifyDataColumnSidecarKzgProofs(
       kzgCommitments,
@@ -549,7 +549,7 @@ export async function validateBlockDataColumnSidecars(
 
     if (isGloasDataColumnSidecar(columnSidecar) !== isGloasSidecar) {
       throw new DataColumnSidecarValidationError({
-        code: DataColumnSidecarErrorCode.MISMATCHED_SIDECAR_TYPE,
+        code: DataColumnSidecarErrorCode.INCORRECT_HEADER_ROOT,
         slot: blockSlot,
         expected: isGloasSidecar ? "gloas" : "fulu",
         actual: isGloasDataColumnSidecar(columnSidecar) ? "gloas" : "fulu",

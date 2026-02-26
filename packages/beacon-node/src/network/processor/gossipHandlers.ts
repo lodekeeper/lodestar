@@ -20,6 +20,7 @@ import {
   SubnetID,
   UintNum64,
   deneb,
+  isGloasDataColumnSidecar,
   ssz,
   sszTypesFor,
 } from "@lodestar/types";
@@ -72,12 +73,7 @@ import {validateGossipPayloadAttestationMessage} from "../../chain/validation/pa
 import {OpSource} from "../../chain/validatorMonitor.js";
 import {Metrics} from "../../metrics/index.js";
 import {kzgCommitmentToVersionedHash} from "../../util/blobs.js";
-import {
-  getBlobKzgCommitments,
-  getDataColumnSidecarBlockRoot,
-  getDataColumnSidecarKzgCommitmentsHex,
-  getDataColumnSidecarSlot,
-} from "../../util/dataColumns.js";
+import {getBlobKzgCommitments, getDataColumnSidecarBlockRoot, getDataColumnSidecarSlot} from "../../util/dataColumns.js";
 import {INetworkCore} from "../core/index.js";
 import {NetworkEventBus} from "../events.js";
 import {
@@ -365,7 +361,9 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
           blockRoot: blockRootHex,
           slot,
           index: dataColumnSidecar.index,
-          kzgCommitments: getDataColumnSidecarKzgCommitmentsHex(dataColumnSidecar),
+          kzgCommitments: isGloasDataColumnSidecar(dataColumnSidecar)
+            ? []
+            : dataColumnSidecar.kzgCommitments.map(toHex),
         });
       }
 

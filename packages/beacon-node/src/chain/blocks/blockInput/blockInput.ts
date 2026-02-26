@@ -1,15 +1,5 @@
 import {ForkName, ForkPostFulu, ForkPostGloas, ForkPreDeneb, ForkPreGloas, NUMBER_OF_COLUMNS} from "@lodestar/params";
-import {
-  BeaconBlockBody,
-  BlobIndex,
-  ColumnIndex,
-  DataColumnSidecar,
-  SignedBeaconBlock,
-  Slot,
-  deneb,
-  gloas,
-  isGloasDataColumnSidecar,
-} from "@lodestar/types";
+import {BeaconBlockBody, BlobIndex, ColumnIndex, SignedBeaconBlock, Slot, deneb, fulu, gloas} from "@lodestar/types";
 import {byteArrayEquals, fromHex, prettyBytes, toRootHex, withTimeout} from "@lodestar/utils";
 import {VersionedHashes} from "../../../execution/index.js";
 import {kzgCommitmentToVersionedHash} from "../../../util/blobs.js";
@@ -571,31 +561,6 @@ function assertBlockAndBlobArePaired(
 
 export type ForkColumnsDA = ForkName.fulu;
 
-function getDataColumnSidecarKzgCommitments(sidecar: DataColumnSidecar): deneb.KZGCommitment[] {
-  if (isGloasDataColumnSidecar(sidecar)) {
-    return [];
-  }
-
-  return sidecar.kzgCommitments;
-}
-
-function getDataColumnSidecarParentRootHex(sidecar: DataColumnSidecar, blockRootHex: string): string {
-  if (isGloasDataColumnSidecar(sidecar)) {
-    // Gloas sidecars omit the signed block header, so parent root is unknown until block is available.
-    return blockRootHex;
-  }
-
-  return toRootHex(sidecar.signedBlockHeader.message.parentRoot);
-}
-
-function getDataColumnSidecarSlot(sidecar: DataColumnSidecar): Slot {
-  if (isGloasDataColumnSidecar(sidecar)) {
-    return sidecar.slot;
-  }
-
-  return sidecar.signedBlockHeader.message.slot;
-}
-
 type BlockInputColumnsState =
   | {
       hasBlock: true;
@@ -633,7 +598,7 @@ type BlockInputColumnsState =
  * - The block is not yet seen and all required sampled columns are seen
  * - The block is not yet seen and all required sampled columns are not yet seen
  */
-export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataColumnSidecar[]> {
+export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, fulu.DataColumnSidecars> {
   type = DAType.Columns as const;
 
   state: BlockInputColumnsState;
@@ -646,7 +611,7 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
    *
    * This is different from `dataPromise` which resolves when all data is available or could become available (e.g. through reconstruction)
    */
-  protected computedDataPromise = createPromise<DataColumnSidecar[]>();
+  protected computedDataPromise = createPromise<fulu.DataColumnSidecars>();
 
   private constructor(
     init: BlockInputInit,
@@ -707,22 +672,21 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
   static createFromColumn(
     props: AddColumn & CreateBlockInputMeta & {sampledColumns: ColumnIndex[]; custodyColumns: ColumnIndex[]}
   ): BlockInputColumns {
-    const kzgCommitments = getDataColumnSidecarKzgCommitments(props.columnSidecar);
     const hasAllData =
-      props.daOutOfRange || props.columnSidecar.column.length === 0 || props.sampledColumns.length === 0;
+      props.daOutOfRange || props.columnSidecar.kzgCommitments.length === 0 || props.sampledColumns.length === 0;
     const state: BlockInputColumnsState = {
       hasBlock: false,
       hasAllData,
       hasComputedAllData: hasAllData as false,
-      versionedHashes: kzgCommitments.map(kzgCommitmentToVersionedHash),
+      versionedHashes: props.columnSidecar.kzgCommitments.map(kzgCommitmentToVersionedHash),
     };
     const init: BlockInputInit = {
       daOutOfRange: false,
       timeCreated: props.seenTimestampSec,
       forkName: props.forkName,
       blockRootHex: props.blockRootHex,
-      parentRootHex: getDataColumnSidecarParentRootHex(props.columnSidecar, props.blockRootHex),
-      slot: getDataColumnSidecarSlot(props.columnSidecar),
+      parentRootHex: toRootHex(props.columnSidecar.signedBlockHeader.message.parentRoot),
+      slot: props.columnSidecar.signedBlockHeader.message.slot,
     };
     const blockInput = new BlockInputColumns(init, state, props.sampledColumns, props.custodyColumns);
     if (hasAllData) {
@@ -863,7 +827,7 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
     return this.columnsCache.has(columnIndex);
   }
 
-  getColumn(columnIndex: number): DataColumnSidecar | undefined {
+  getColumn(columnIndex: number): fulu.DataColumnSidecar | undefined {
     return this.columnsCache.get(columnIndex)?.columnSidecar;
   }
 
@@ -871,8 +835,8 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
     return this.state.versionedHashes;
   }
 
-  getCustodyColumns(): DataColumnSidecar[] {
-    const columns: DataColumnSidecar[] = [];
+  getCustodyColumns(): fulu.DataColumnSidecars {
+    const columns: fulu.DataColumnSidecars = [];
     for (const index of this.custodyColumns) {
       const column = this.columnsCache.get(index);
       if (column) {
@@ -893,8 +857,8 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
     return columns;
   }
 
-  getSampledColumns(): DataColumnSidecar[] {
-    const columns: DataColumnSidecar[] = [];
+  getSampledColumns(): fulu.DataColumnSidecars {
+    const columns: fulu.DataColumnSidecars = [];
     for (const index of this.sampledColumns) {
       const column = this.columnsCache.get(index);
       if (column) {
@@ -908,7 +872,7 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
     return [...this.columnsCache.values()];
   }
 
-  getAllColumns(): DataColumnSidecar[] {
+  getAllColumns(): fulu.DataColumnSidecars {
     return this.getAllColumnsWithSource().map(({columnSidecar}) => columnSidecar);
   }
 
@@ -936,7 +900,7 @@ export class BlockInputColumns extends AbstractBlockInput<ForkColumnsDA, DataCol
     return this.state.hasComputedAllData;
   }
 
-  waitForComputedAllData(timeout: number, signal?: AbortSignal): Promise<DataColumnSidecar[]> {
+  waitForComputedAllData(timeout: number, signal?: AbortSignal): Promise<fulu.DataColumnSidecars> {
     if (!this.state.hasComputedAllData) {
       return withTimeout(() => this.computedDataPromise.promise, timeout, signal);
     }
