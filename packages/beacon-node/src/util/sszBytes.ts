@@ -410,6 +410,9 @@ export function getSlotFromBlobSidecarSerialized(data: Uint8Array): Slot | null 
  */
 
 const DATA_COLUMN_SIDECAR_FIRST_OFFSET_POSITION = 8;
+// Gloas DataColumnSidecar SSZ layout:
+//   index (8 bytes) | column offset (4 bytes) | kzgProofs offset (4 bytes) | slot (8 bytes) | beaconBlockRoot (32 bytes)
+// Fixed portion total: 8 + 4 + 4 + 8 + 32 = 56
 const GLOAS_DATA_COLUMN_SIDECAR_FIRST_OFFSET = 56;
 const SLOT_BYTES_POSITION_IN_FULU_DATA_COLUMN_SIDECAR = 20;
 const SLOT_BYTES_POSITION_IN_GLOAS_DATA_COLUMN_SIDECAR = 16;
@@ -527,6 +530,9 @@ export function getBlobKzgCommitmentsCountFromSignedBeaconBlockSerialized(
   const forkName = config.getForkName(slot);
 
   if (isForkPostGloas(forkName)) {
+    // Gloas stores commitments under signedExecutionPayloadBid.message.blobKzgCommitments.
+    // The nested container/list offset chain is fork-specific and not safely addressable
+    // with fixed offsets, so do a full SSZ deserialize for correctness.
     const signedBlock = ssz[forkName].SignedBeaconBlock.deserialize(blockBytes);
     return signedBlock.message.body.signedExecutionPayloadBid.message.blobKzgCommitments.length;
   }

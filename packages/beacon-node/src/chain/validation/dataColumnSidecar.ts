@@ -243,10 +243,13 @@ async function validateGossipDataColumnSidecarGloas(
   gossipSubnet: SubnetID,
   metrics: Metrics | null
 ): Promise<void> {
+  // SPEC FUNCTION
+  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/gloas/p2p-interface.md
   const blockRoot = getDataColumnSidecarBlockRoot(dataColumnSidecar);
   const blockRootHex = toRootHex(blockRoot);
   const slot = getDataColumnSidecarSlot(dataColumnSidecar);
 
+  // 1) [IGNORE] Sidecar block must be known from cache or DB.
   const cachedBlockInput = chain.seenBlockInputCache.get(blockRootHex);
   const blockData = cachedBlockInput?.hasBlock()
     ? cachedBlockInput.getBlock()
@@ -270,10 +273,12 @@ async function validateGossipDataColumnSidecarGloas(
     });
   }
 
+  // 2) [REJECT] Sidecar must pass verify_data_column_sidecar against block commitments.
   const kzgCommitments = (blockData as gloas.SignedBeaconBlock).message.body.signedExecutionPayloadBid.message
     .blobKzgCommitments;
   verifyDataColumnSidecarGloas(dataColumnSidecar, kzgCommitments);
 
+  // 3) [REJECT] Sidecar must be on the correct subnet.
   if (computeSubnetForDataColumnSidecar(chain.config, dataColumnSidecar) !== gossipSubnet) {
     throw new DataColumnSidecarGossipError(GossipAction.REJECT, {
       code: DataColumnSidecarErrorCode.INVALID_SUBNET,
@@ -283,6 +288,7 @@ async function validateGossipDataColumnSidecarGloas(
   }
 
   const kzgProofTimer = metrics?.peerDas.dataColumnSidecarKzgProofsVerificationTime.startTimer();
+  // 4) [REJECT] Sidecar kzg proofs must verify.
   try {
     await verifyDataColumnSidecarKzgProofs(
       kzgCommitments,
@@ -543,7 +549,7 @@ export async function validateBlockDataColumnSidecars(
 
     if (isGloasDataColumnSidecar(columnSidecar) !== isGloasSidecar) {
       throw new DataColumnSidecarValidationError({
-        code: DataColumnSidecarErrorCode.INCORRECT_HEADER_ROOT,
+        code: DataColumnSidecarErrorCode.MISMATCHED_SIDECAR_TYPE,
         slot: blockSlot,
         expected: isGloasSidecar ? "gloas" : "fulu",
         actual: isGloasDataColumnSidecar(columnSidecar) ? "gloas" : "fulu",

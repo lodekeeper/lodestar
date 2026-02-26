@@ -1,15 +1,7 @@
 import {routes} from "@lodestar/api";
 import {ChainForkConfig} from "@lodestar/config";
 import {ForkPostDeneb, ForkPostFulu, ForkPreFulu, isForkPostDeneb, isForkPostFulu} from "@lodestar/params";
-import {
-  BlobIndex,
-  ColumnIndex,
-  DataColumnSidecar,
-  SignedBeaconBlock,
-  Slot,
-  deneb,
-  isGloasDataColumnSidecar,
-} from "@lodestar/types";
+import {BlobIndex, ColumnIndex, DataColumnSidecar, SignedBeaconBlock, Slot, deneb} from "@lodestar/types";
 import {LodestarError, byteArrayEquals, fromHex, prettyPrintIndices, toHex, toRootHex} from "@lodestar/utils";
 import {isBlockInputBlobs, isBlockInputColumns} from "../../chain/blocks/blockInput/blockInput.js";
 import {BlockInputSource, IBlockInput} from "../../chain/blocks/blockInput/types.js";
@@ -20,7 +12,7 @@ import {validateBlockDataColumnSidecars} from "../../chain/validation/dataColumn
 import {INetwork} from "../../network/interface.js";
 import {PeerSyncMeta} from "../../network/peers/peersData.js";
 import {prettyPrintPeerIdStr} from "../../network/util.js";
-import {getBlobKzgCommitments} from "../../util/dataColumns.js";
+import {getBlobKzgCommitments, getDataColumnSidecarKzgCommitmentsHex} from "../../util/dataColumns.js";
 import {PeerIdStr} from "../../util/peerId.js";
 import {WarnResult} from "../../util/wrapError.js";
 import {
@@ -184,7 +176,7 @@ export async function downloadByRoot({
           blockRoot: rootHex,
           slot: blockInput.slot,
           index: columnSidecar.index,
-          kzgCommitments: isGloasDataColumnSidecar(columnSidecar) ? [] : columnSidecar.kzgCommitments.map(toHex),
+          kzgCommitments: getDataColumnSidecarKzgCommitmentsHex(columnSidecar),
         });
       }
     }

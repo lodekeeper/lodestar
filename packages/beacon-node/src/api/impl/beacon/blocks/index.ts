@@ -30,7 +30,6 @@ import {
   deneb,
   gloas,
   isDenebBlockContents,
-  isGloasDataColumnSidecar,
   sszTypesFor,
 } from "@lodestar/types";
 import {fromHex, sleep, toHex, toRootHex} from "@lodestar/utils";
@@ -55,7 +54,11 @@ import {
   kzgCommitmentToVersionedHash,
   reconstructBlobs,
 } from "../../../../util/blobs.js";
-import {getDataColumnSidecarsForGloas, getDataColumnSidecarsFromBlock} from "../../../../util/dataColumns.js";
+import {
+  getDataColumnSidecarKzgCommitmentsHex,
+  getDataColumnSidecarsForGloas,
+  getDataColumnSidecarsFromBlock,
+} from "../../../../util/dataColumns.js";
 import {isOptimisticBlock} from "../../../../util/forkChoice.js";
 import {kzg} from "../../../../util/kzg.js";
 import {promiseAllMaybeAsync} from "../../../../util/promises.js";
@@ -351,9 +354,7 @@ export function getBeaconBlockApi({
             blockRoot,
             slot,
             index: dataColumnSidecar.index,
-            kzgCommitments: isGloasDataColumnSidecar(dataColumnSidecar)
-              ? []
-              : dataColumnSidecar.kzgCommitments.map(toHex),
+            kzgCommitments: getDataColumnSidecarKzgCommitmentsHex(dataColumnSidecar),
           });
         }
       }
