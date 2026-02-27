@@ -59,7 +59,9 @@ export async function validateAttesterSlashing(
     });
   }
 
-  // process_attester_slashing requires at least one intersecting validator to be slashable.
+  // Additional gossip-side check: assertValidAttesterSlashing() validates slashable data/signatures,
+  // but it does not enforce that any intersecting validator is currently slashable.
+  // Spec reference: process_attester_slashing() requires slashed_any == True after iterating intersecting indices.
   const currentEpoch = state.epochCtx.epoch;
   const validators = state.validators;
   if (!intersectingIndices.some((index) => isSlashableValidator(validators.getReadonly(index), currentEpoch))) {

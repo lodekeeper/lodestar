@@ -10,7 +10,7 @@ import {readdirSyncSpec, specTestIterator} from "../utils/specTestIterator.js";
 import {runGossipValidationTest} from "../utils/gossipValidation.js";
 import {RunnerType, TestRunnerCustom} from "../utils/types.js";
 
-// ── Existing networking handlers (compute_columns, get_custody_groups) ──
+// Existing networking handlers (compute_columns, get_custody_groups)
 
 type ComputeColumnForCustodyGroupInput = {
   custody_group: number;
@@ -38,7 +38,7 @@ type NetworkingTestCase = {
   };
 };
 
-// ── Gossip validation skips ────────────────────────────────────────────
+// Gossip validation skips
 
 // Tests that may need to be skipped because the checks are performed
 // outside gossip validation in Lodestar (same pattern as Teku).
@@ -49,7 +49,7 @@ const SKIPPED_GOSSIP_TESTS = new Set<string>([
   "gossip_beacon_attestation__reject_invalid_signature",
 ]);
 
-// ── Gossip topic set ───────────────────────────────────────────────────
+// Gossip topic set
 
 const GOSSIP_HANDLERS = new Set([
   "gossip_beacon_block",
@@ -60,7 +60,7 @@ const GOSSIP_HANDLERS = new Set([
   "gossip_voluntary_exit",
 ]);
 
-// ── Combined networking runner (custom type to handle both) ────────────
+// Combined networking runner (custom type to handle both)
 
 const networking: TestRunnerCustom = (fork, testHandler, testSuite, testSuiteDirpath) => {
   if (GOSSIP_HANDLERS.has(testHandler)) {
