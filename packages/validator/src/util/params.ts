@@ -331,6 +331,8 @@ function getSpecCriticalParams(localConfig: ChainConfig): Record<keyof ConfigWit
     INCLUSION_LIST_SUBMISSION_DUE_BPS_EIP7782: eip7782ForkRelevant,
     PROPOSER_INCLUSION_LIST_CUTOFF_BPS_EIP7782: eip7782ForkRelevant,
     EPOCHS_PER_SYNC_COMMITTEE_PERIOD_EIP7782: eip7782ForkRelevant,
+    MAX_PER_EPOCH_ACTIVATION_EXIT_CHURN_LIMIT_EIP7782: eip7782ForkRelevant,
+    MIN_PER_EPOCH_CHURN_LIMIT_EIP7782: eip7782ForkRelevant,
 
     // GLOAS
     ATTESTATION_DUE_BPS_GLOAS: gloasForkRelevant,
