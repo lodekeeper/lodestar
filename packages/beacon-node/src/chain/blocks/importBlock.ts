@@ -266,7 +266,9 @@ export async function importBlock(
       this.metrics.headSlot.set(newHead.slot);
       // Only track "recent" blocks. Otherwise sync can distort this metrics heavily.
       // We want to track recent blocks coming from gossip, unknown block sync, and API.
-      if (delaySec < (SLOTS_PER_EPOCH * this.config.SLOT_DURATION_MS) / 1000) {
+      // EIP-7782: use fork-aware slot duration for epoch threshold
+      const headFork = this.config.getForkName(newHead.slot);
+      if (delaySec < (SLOTS_PER_EPOCH * this.config.getSlotDurationMsForFork(headFork)) / 1000) {
         this.metrics.importBlock.elapsedTimeTillBecomeHead.observe(delaySec);
         const cutOffSec = this.config.getAttestationDueMs(this.config.getForkName(blockSlot)) / 1000;
         if (delaySec > cutOffSec) {
