@@ -78,9 +78,9 @@ export class Clock extends EventEmitter implements IClock {
 
     this.config = config;
     this.genesisTime = genesisTime;
-    this.timeoutId = setTimeout(this.onNextSlot, this.msUntilNextSlot());
     this.signal = signal;
     this._currentSlot = getCurrentSlot(this.config, this.genesisTime);
+    this.timeoutId = setTimeout(this.onNextSlot, this.msUntilNextSlot());
     this.signal.addEventListener("abort", () => clearTimeout(this.timeoutId), {once: true});
   }
 
