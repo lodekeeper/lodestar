@@ -1,24 +1,24 @@
 import {routes} from "@lodestar/api";
-import {ChainForkConfig} from "@lodestar/config";
+import type {ChainForkConfig} from "@lodestar/config";
 import {getSafeExecutionBlockHash} from "@lodestar/fork-choice";
-import {ForkPostBellatrix, ForkSeq, SLOTS_PER_EPOCH, isForkPostBellatrix} from "@lodestar/params";
+import {type ForkPostBellatrix, ForkSeq, SLOTS_PER_EPOCH, isForkPostBellatrix} from "@lodestar/params";
 import {
-  CachedBeaconStateAllForks,
-  CachedBeaconStateExecutions,
-  CachedBeaconStateGloas,
+  type CachedBeaconStateAllForks,
+  type CachedBeaconStateExecutions,
+  type CachedBeaconStateGloas,
   StateHashTreeRootSource,
   computeEpochAtSlot,
   computeTimeAtSlot,
 } from "@lodestar/state-transition";
-import {Slot} from "@lodestar/types";
-import {Logger, fromHex, isErrorAborted, sleep} from "@lodestar/utils";
+import type {Slot} from "@lodestar/types";
+import {type Logger, fromHex, isErrorAborted, sleep} from "@lodestar/utils";
 import {GENESIS_SLOT, ZERO_HASH_HEX} from "../constants/constants.js";
 import {BuilderStatus} from "../execution/builder/http.js";
-import {Metrics} from "../metrics/index.js";
+import type {Metrics} from "../metrics/index.js";
 import {ClockEvent} from "../util/clock.js";
 import {isQueueErrorAborted} from "../util/queue/index.js";
 import {ForkchoiceCaller} from "./forkChoice/index.js";
-import {IBeaconChain} from "./interface.js";
+import type {IBeaconChain} from "./interface.js";
 import {getPayloadAttributesForSSE, prepareExecutionPayload} from "./produceBlock/produceBlockBody.js";
 import {RegenCaller} from "./regen/index.js";
 
@@ -200,7 +200,10 @@ export class PrepareNextSlotScheduler {
             // feeRecipient, so just pass zero hash for now till a real use case arises
             feeRecipient: "0x0000000000000000000000000000000000000000000000000000000000000000",
           });
-          this.chain.emitter.emit(routes.events.EventType.payloadAttributes, {data, version: fork});
+          this.chain.emitter.emit(routes.events.EventType.payloadAttributes, {
+            data,
+            version: fork,
+          });
         }
       } else {
         this.computeStateHashTreeRoot(prepareState, isEpochTransition);
@@ -230,7 +233,26 @@ export class PrepareNextSlotScheduler {
     } catch (e) {
       if (!isErrorAborted(e) && !isQueueErrorAborted(e)) {
         this.metrics?.precomputeNextEpochTransition.count.inc({result: "error"}, 1);
-        this.logger.error("Failed to run prepareForNextSlot", {nextEpoch, isEpochTransition, prepareSlot}, e as Error);
+        // With shorter slot durations (e.g. EIP-7782), the EL may not have processed the latest
+        // block by the time prepareForNextSlot fires. The EL returns "Invalid payload attributes"
+        // when the head block hash is unknown. This is transient and resolves once the EL catches up.
+        const isTransientElError =
+          e instanceof Error &&
+          (e.message.includes("Invalid payload attributes") || e.message.includes("Execution Layer Syncing"));
+        if (isTransientElError) {
+          this.logger.warn("Failed to run prepareForNextSlot (EL not ready)", {
+            nextEpoch,
+            isEpochTransition,
+            prepareSlot,
+            error: (e as Error).message,
+          });
+        } else {
+          this.logger.error(
+            "Failed to run prepareForNextSlot",
+            {nextEpoch, isEpochTransition, prepareSlot},
+            e as Error
+          );
+        }
       }
     }
   };
