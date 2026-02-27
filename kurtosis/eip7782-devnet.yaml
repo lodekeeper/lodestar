@@ -9,7 +9,7 @@ participants:
   - el_type: geth
     cl_type: lodestar
     cl_image: lodestar-eip7782:dev
-    count: 2
+    count: 4
     supernode: true
     cl_extra_params:
       - "--params.EIP7782_FORK_EPOCH=1"
