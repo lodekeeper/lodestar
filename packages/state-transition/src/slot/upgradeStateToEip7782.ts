@@ -17,5 +17,9 @@ export function upgradeStateToEip7782(stateFulu: CachedBeaconStateFulu): CachedB
   });
 
   stateEip7782.commit();
+  // Clear cache to ensure the cache of fulu fields is not used by new eip7782 fields
+  // biome-ignore lint/complexity/useLiteralKeys: It is a protected attribute
+  stateEip7782["clearCache"]();
+
   return stateEip7782;
 }
