@@ -257,8 +257,9 @@ export function getValidatorApi(
    */
   function msToNextEpoch(): number {
     const nextEpoch = chain.clock.currentEpoch + 1;
-    const secPerEpoch = (SLOTS_PER_EPOCH * config.SLOT_DURATION_MS) / 1000;
-    const nextEpochStartSec = chain.genesisTime + nextEpoch * secPerEpoch;
+    // EIP-7782: use fork-aware computeTimeAtSlot for correct epoch boundaries
+    const nextEpochSlot = computeStartSlotAtEpoch(nextEpoch);
+    const nextEpochStartSec = computeTimeAtSlot(config, nextEpochSlot, chain.genesisTime);
     return nextEpochStartSec * 1000 - Date.now();
   }
 
@@ -1097,8 +1098,11 @@ export function getValidatorApi(
       const head = chain.forkChoice.getHead();
       let state: CachedBeaconStateAllForks | undefined = undefined;
       const startSlot = computeStartSlotAtEpoch(epoch);
+      // EIP-7782: use fork-aware slot duration for lookahead calculation
+      const startFork = config.getForkName(startSlot);
       const prepareNextSlotLookAheadMs =
-        config.SLOT_DURATION_MS - config.getSlotComponentDurationMs(PREPARE_NEXT_SLOT_BPS);
+        config.getSlotDurationMsForFork(startFork) -
+        config.getSlotComponentDurationMsForFork(PREPARE_NEXT_SLOT_BPS, startFork);
       const toNextEpochMs = msToNextEpoch();
       // validators may request next epoch's duties when it's close to next epoch
       // this is to avoid missed block proposal due to 0 epoch look ahead
