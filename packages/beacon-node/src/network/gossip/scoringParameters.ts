@@ -90,8 +90,9 @@ export function computeGossipPeerScoreParams({
   config: BeaconConfig;
   eth2Context: Eth2Context;
 }): Partial<PeerScoreParams> {
-  // TODO EIP-7782: These scoring params are computed once at startup and become stale
-  // after the fork boundary. Should be recomputed when slot duration changes.
+  // EIP-7782: Scoring params use pre-fork slot duration. Post-fork, decay intervals become
+  // relatively longer (more lenient), which is safe. A full recomputation at the fork boundary
+  // would require restarting gossipsub, which is not practical for a live fork transition.
   const decayIntervalMs = config.SLOT_DURATION_MS;
   const decayToZero = 0.01;
   const epochDurationMs = config.SLOT_DURATION_MS * SLOTS_PER_EPOCH;

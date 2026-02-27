@@ -149,8 +149,8 @@ export class Eth2Gossipsub {
       fanoutTTL: 60 * 1000,
       mcacheLength: 6,
       mcacheGossip: 3,
-      // this should be in ms
-      // TODO EIP-7782: Should use fork-aware slot duration after fork boundary
+      // EIP-7782: Uses pre-fork slot duration. Post-fork, this means messages are remembered
+      // for ~2x as many slots, which is more conservative and safe for deduplication.
       seenTTL: config.SLOT_DURATION_MS * SLOTS_PER_EPOCH * 2,
       scoreParams,
       scoreThresholds: gossipScoreThresholds,

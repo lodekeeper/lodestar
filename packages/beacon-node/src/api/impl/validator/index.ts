@@ -190,12 +190,10 @@ export function getValidatorApi(
    * This value is the same to MAXIMUM_GOSSIP_CLOCK_DISPARITY.
    * For very fast networks, reduce clock disparity to half a slot.
    */
-  // TODO EIP-7782: This should use fork-aware slot duration for post-fork accuracy.
-  // Pre-fork: min(500ms, 6000ms) = 500ms. Post-fork: min(500ms, 3000ms) = 500ms. Safe for now.
-  const MAX_API_CLOCK_DISPARITY_SEC = Math.min(
-    config.MAXIMUM_GOSSIP_CLOCK_DISPARITY / 1000,
-    config.SLOT_DURATION_MS / 2000
-  );
+  // EIP-7782: Use the minimum slot duration to be safe for both pre and post-fork.
+  // Pre-fork: min(500ms, 6000ms) = 500ms. Post-fork: min(500ms, 3000ms) = 500ms.
+  const minSlotDurationMs = Math.min(config.SLOT_DURATION_MS, config.SLOT_DURATION_MS_EIP7782);
+  const MAX_API_CLOCK_DISPARITY_SEC = Math.min(config.MAXIMUM_GOSSIP_CLOCK_DISPARITY / 1000, minSlotDurationMs / 2000);
   const MAX_API_CLOCK_DISPARITY_MS = MAX_API_CLOCK_DISPARITY_SEC * 1000;
 
   /** Compute and cache the genesis block root */
