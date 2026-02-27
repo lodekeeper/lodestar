@@ -90,13 +90,17 @@ export function computeGossipPeerScoreParams({
   config: BeaconConfig;
   eth2Context: Eth2Context;
 }): Partial<PeerScoreParams> {
-  // EIP-7782: Scoring params use pre-fork slot duration. Post-fork, decay intervals become
-  // relatively longer (more lenient), which is safe. A full recomputation at the fork boundary
-  // would require restarting gossipsub, which is not practical for a live fork transition.
-  const decayIntervalMs = config.SLOT_DURATION_MS;
+  // EIP-7782: Use minimum slot duration across forks for scoring params when EIP-7782 is scheduled.
+  // These are set at startup and don't change at fork boundary. Using the minimum ensures
+  // scoring is appropriately strict for the shortest slot duration the node will operate under.
+  const minSlotDurationMs =
+    config.EIP7782_FORK_EPOCH < Infinity
+      ? Math.min(config.SLOT_DURATION_MS, config.SLOT_DURATION_MS_EIP7782)
+      : config.SLOT_DURATION_MS;
+  const decayIntervalMs = minSlotDurationMs;
   const decayToZero = 0.01;
-  const epochDurationMs = config.SLOT_DURATION_MS * SLOTS_PER_EPOCH;
-  const slotDurationMs = config.SLOT_DURATION_MS;
+  const epochDurationMs = minSlotDurationMs * SLOTS_PER_EPOCH;
+  const slotDurationMs = minSlotDurationMs;
   const scoreParameterDecayFn = (decayTimeMs: number): number => {
     return scoreParameterDecayWithBase(decayTimeMs, decayIntervalMs, decayToZero);
   };
@@ -310,13 +314,14 @@ function getTopicScoreParams(
 
   if (meshMessageInfo) {
     const {decaySlots, capFactor, activationWindow, currentSlot} = meshMessageInfo;
-    const decayTimeMs = config.SLOT_DURATION_MS * decaySlots;
+    const decayTimeMs = slotDurationMs * decaySlots;
     params.meshMessageDeliveriesDecay = scoreParameterDecayFn(decayTimeMs);
     params.meshMessageDeliveriesThreshold = threshold(params.meshMessageDeliveriesDecay, expectedMessageRate / 50);
     params.meshMessageDeliveriesCap = Math.max(capFactor * params.meshMessageDeliveriesThreshold, 2);
     params.meshMessageDeliveriesActivation = activationWindow;
     // the default in gossipsub is 2s is not enough since lodestar suffers from I/O lag
-    params.meshMessageDeliveriesWindow = 12 * 1000; // 12s
+    // EIP-7782: Scale with slot duration (1 slot)
+    params.meshMessageDeliveriesWindow = slotDurationMs;
     params.meshFailurePenaltyDecay = params.meshMessageDeliveriesDecay;
     params.meshMessageDeliveriesWeight =
       (-1 * maxPositiveScore) / (params.topicWeight * Math.pow(params.meshMessageDeliveriesThreshold, 2));
