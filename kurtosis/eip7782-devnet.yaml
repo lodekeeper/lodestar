@@ -1,5 +1,5 @@
 # EIP-7782 (6-second slots) Devnet — Lodestar only
-# Tests fork transition from Fulu (12s) to EIP-7782 (6s) at epoch 5
+# Tests fork transition from Fulu (12s) to EIP-7782 (6s) at epoch 1
 
 participants:
   - el_type: geth
@@ -45,6 +45,7 @@ participants:
 network_params:
   electra_fork_epoch: 0
   fulu_fork_epoch: 0
+  eip7782_fork_epoch: 1
   seconds_per_slot: 12
   genesis_delay: 30
   num_validator_keys_per_node: 32
