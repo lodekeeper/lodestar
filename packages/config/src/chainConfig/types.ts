@@ -47,6 +47,9 @@ export type ChainConfig = {
   // FULU
   FULU_FORK_VERSION: Uint8Array;
   FULU_FORK_EPOCH: number;
+  // EIP-7782
+  EIP7782_FORK_VERSION: Uint8Array;
+  EIP7782_FORK_EPOCH: number;
   // GLOAS
   GLOAS_FORK_VERSION: Uint8Array;
   GLOAS_FORK_EPOCH: number;
@@ -55,6 +58,7 @@ export type ChainConfig = {
   /** @deprecated Use `SLOT_DURATION_MS` instead. */
   SECONDS_PER_SLOT: number;
   SLOT_DURATION_MS: number;
+  SLOT_DURATION_MS_EIP7782: number;
   SECONDS_PER_ETH1_BLOCK: number;
   MIN_VALIDATOR_WITHDRAWABILITY_DELAY: number;
   MIN_BUILDER_WITHDRAWABILITY_DELAY: number;
@@ -72,6 +76,17 @@ export type ChainConfig = {
   SYNC_MESSAGE_DUE_BPS_GLOAS: number;
   CONTRIBUTION_DUE_BPS_GLOAS: number;
   PAYLOAD_ATTESTATION_DUE_BPS: number;
+
+  ATTESTATION_DUE_BPS_EIP7782: number;
+  AGGREGRATE_DUE_BPS_EIP7782: number;
+  SYNC_MESSAGE_DUE_BPS_EIP7782: number;
+  CONTRIBUTION_DUE_BPS_EIP7782: number;
+  PROPOSER_REORG_CUTOFF_BPS_EIP7782: number;
+  PAYLOAD_ATTESTATION_DUE_BPS_EIP7782: number;
+  VIEW_FREEZE_CUTOFF_BPS_EIP7782: number;
+  INCLUSION_LIST_SUBMISSION_DUE_BPS_EIP7782: number;
+  PROPOSER_INCLUSION_LIST_CUTOFF_BPS_EIP7782: number;
+  EPOCHS_PER_SYNC_COMMITTEE_PERIOD_EIP7782: number;
 
   // Validator cycle
   INACTIVITY_SCORE_BIAS: number;
@@ -164,6 +179,9 @@ export const chainConfigTypes: SpecTypes<ChainConfig> = {
   // FULU
   FULU_FORK_VERSION: "bytes",
   FULU_FORK_EPOCH: "number",
+  // EIP-7782
+  EIP7782_FORK_VERSION: "bytes",
+  EIP7782_FORK_EPOCH: "number",
   // GLOAS
   GLOAS_FORK_VERSION: "bytes",
   GLOAS_FORK_EPOCH: "number",
@@ -171,6 +189,7 @@ export const chainConfigTypes: SpecTypes<ChainConfig> = {
   // Time parameters
   SECONDS_PER_SLOT: "number",
   SLOT_DURATION_MS: "number",
+  SLOT_DURATION_MS_EIP7782: "number",
   SECONDS_PER_ETH1_BLOCK: "number",
   MIN_VALIDATOR_WITHDRAWABILITY_DELAY: "number",
   MIN_BUILDER_WITHDRAWABILITY_DELAY: "number",
@@ -188,6 +207,17 @@ export const chainConfigTypes: SpecTypes<ChainConfig> = {
   SYNC_MESSAGE_DUE_BPS_GLOAS: "number",
   CONTRIBUTION_DUE_BPS_GLOAS: "number",
   PAYLOAD_ATTESTATION_DUE_BPS: "number",
+
+  ATTESTATION_DUE_BPS_EIP7782: "number",
+  AGGREGRATE_DUE_BPS_EIP7782: "number",
+  SYNC_MESSAGE_DUE_BPS_EIP7782: "number",
+  CONTRIBUTION_DUE_BPS_EIP7782: "number",
+  PROPOSER_REORG_CUTOFF_BPS_EIP7782: "number",
+  PAYLOAD_ATTESTATION_DUE_BPS_EIP7782: "number",
+  VIEW_FREEZE_CUTOFF_BPS_EIP7782: "number",
+  INCLUSION_LIST_SUBMISSION_DUE_BPS_EIP7782: "number",
+  PROPOSER_INCLUSION_LIST_CUTOFF_BPS_EIP7782: "number",
+  EPOCHS_PER_SYNC_COMMITTEE_PERIOD_EIP7782: "number",
 
   // Validator cycle
   INACTIVITY_SCORE_BIAS: "number",
