@@ -118,13 +118,6 @@ export const SYNC_TOLERANCE_EPOCHS = 1;
  * TODO GLOAS: re-evaluate cutoff timing
  */
 const BLOCK_PRODUCTION_RACE_CUTOFF_MS = 2_000;
-/**
- * Overall timeout for execution and block production apis.
- * Uses slot duration (12s pre-EIP7782, 6s post-EIP7782).
- * Defined as a constant for pre-fork default; fork-aware value computed at call site.
- */
-// const BLOCK_PRODUCTION_RACE_TIMEOUT_MS = 12_000;
-
 type ProduceBlockContentsRes = {executionPayloadValue: Wei; consensusBlockValue: Wei} & {
   data: BlockContents;
   version: ForkName;
@@ -190,10 +183,10 @@ export function getValidatorApi(
    * This value is the same to MAXIMUM_GOSSIP_CLOCK_DISPARITY.
    * For very fast networks, reduce clock disparity to half a slot.
    */
-  // EIP-7782: Use the minimum slot duration to be safe for both pre and post-fork.
-  // Pre-fork: min(500ms, 6000ms) = 500ms. Post-fork: min(500ms, 3000ms) = 500ms.
-  const minSlotDurationMs = Math.min(config.SLOT_DURATION_MS, config.SLOT_DURATION_MS_EIP7782);
-  const MAX_API_CLOCK_DISPARITY_SEC = Math.min(config.MAXIMUM_GOSSIP_CLOCK_DISPARITY / 1000, minSlotDurationMs / 2000);
+  const MAX_API_CLOCK_DISPARITY_SEC = Math.min(
+    config.MAXIMUM_GOSSIP_CLOCK_DISPARITY / 1000,
+    config.SLOT_DURATION_MS / 2000
+  );
   const MAX_API_CLOCK_DISPARITY_MS = MAX_API_CLOCK_DISPARITY_SEC * 1000;
 
   /** Compute and cache the genesis block root */
@@ -676,8 +669,7 @@ export function getValidatorApi(
 
     // Calculate cutoff time based on start of the slot
     const cutoffMs = Math.max(0, BLOCK_PRODUCTION_RACE_CUTOFF_MS - chain.clock.msFromSlot(slot));
-    // Use fork-aware slot duration for race timeout (6s post-EIP7782)
-    const blockProductionTimeoutMs = config.getSlotDurationMsForFork(config.getForkName(slot));
+    const blockProductionTimeoutMs = config.getSlotDurationMsForFork(fork);
 
     logger.verbose("Block production race (builder vs execution) starting", {
       ...loggerContext,
@@ -1098,7 +1090,6 @@ export function getValidatorApi(
       const head = chain.forkChoice.getHead();
       let state: CachedBeaconStateAllForks | undefined = undefined;
       const startSlot = computeStartSlotAtEpoch(epoch);
-      // EIP-7782: use fork-aware slot duration for lookahead calculation
       const startFork = config.getForkName(startSlot);
       const prepareNextSlotLookAheadMs =
         config.getSlotDurationMsForFork(startFork) -

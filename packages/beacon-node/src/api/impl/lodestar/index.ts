@@ -29,9 +29,7 @@ export function getLodestarApi({
   let writingProfile = false;
   // for NodeJS, profile the whole epoch
   // for Bun, profile 1 slot. Otherwise it will either crash the app, and/or inspector cannot render the profile
-  // EIP-7782: use minimum slot duration as safe default (6s post-fork)
-  const minSlotMs = Math.min(config.SLOT_DURATION_MS, config.SLOT_DURATION_MS_EIP7782);
-  const defaultProfileMs = globalThis.Bun ? minSlotMs : SLOTS_PER_EPOCH * minSlotMs;
+  const defaultProfileMs = globalThis.Bun ? config.SLOT_DURATION_MS : SLOTS_PER_EPOCH * config.SLOT_DURATION_MS;
 
   return {
     async writeHeapdump({thread = "main", dirpath = "."}) {
