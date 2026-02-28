@@ -669,7 +669,7 @@ export function getValidatorApi(
 
     // Calculate cutoff time based on start of the slot
     const cutoffMs = Math.max(0, BLOCK_PRODUCTION_RACE_CUTOFF_MS - chain.clock.msFromSlot(slot));
-    const blockProductionTimeoutMs = config.getSlotDurationMsForFork(fork);
+    const blockProductionTimeoutMs = config.getSlotDurationMs(fork);
 
     logger.verbose("Block production race (builder vs execution) starting", {
       ...loggerContext,
@@ -1092,7 +1092,7 @@ export function getValidatorApi(
       const startSlot = computeStartSlotAtEpoch(epoch);
       const startFork = config.getForkName(startSlot);
       const prepareNextSlotLookAheadMs =
-        config.getSlotDurationMsForFork(startFork) -
+        config.getSlotDurationMs(startFork) -
         config.getSlotComponentDurationMsForFork(PREPARE_NEXT_SLOT_BPS, startFork);
       const toNextEpochMs = msToNextEpoch();
       // validators may request next epoch's duties when it's close to next epoch

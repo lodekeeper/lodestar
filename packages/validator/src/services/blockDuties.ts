@@ -173,7 +173,7 @@ export class BlockDutiesService {
     // EIP-7782: use fork-aware slot duration for lookahead timing
     const nextFork = this.config.getForkName(nextSlot);
     const lookAheadMs =
-      this.config.getSlotDurationMsForFork(nextFork) -
+      this.config.getSlotDurationMs(nextFork) -
       this.config.getSlotComponentDurationMsForFork(BLOCK_DUTIES_LOOKAHEAD_BPS, nextFork);
     await sleep(this.clock.msToSlot(nextSlot) - lookAheadMs, signal);
     this.logger.debug("Polling proposers for next epoch", {nextEpoch, nextSlot});

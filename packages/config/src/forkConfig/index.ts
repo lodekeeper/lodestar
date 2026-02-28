@@ -246,15 +246,15 @@ export function createForkConfig(config: ChainConfig): ForkConfig {
       }
       return this.getSlotComponentDurationMs(config.CONTRIBUTION_DUE_BPS);
     },
-    getProposerReorgCutoffMs(_fork: ForkName): number {
-      if (isForkPostEip7782(_fork)) {
-        return this.getSlotComponentDurationMsForFork(config.PROPOSER_REORG_CUTOFF_BPS_EIP7782, _fork);
+    getProposerReorgCutoffMs(fork: ForkName): number {
+      if (isForkPostEip7782(fork)) {
+        return this.getSlotComponentDurationMsForFork(config.PROPOSER_REORG_CUTOFF_BPS_EIP7782, fork);
       }
       return this.getSlotComponentDurationMs(config.PROPOSER_REORG_CUTOFF_BPS);
     },
 
     /** Get slot duration in ms for a given fork */
-    getSlotDurationMsForFork(fork: ForkName): number {
+    getSlotDurationMs(fork: ForkName): number {
       return isForkPostEip7782(fork) ? config.SLOT_DURATION_MS_EIP7782 : config.SLOT_DURATION_MS;
     },
 

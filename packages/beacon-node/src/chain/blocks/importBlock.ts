@@ -268,7 +268,7 @@ export async function importBlock(
       // We want to track recent blocks coming from gossip, unknown block sync, and API.
       // EIP-7782: use fork-aware slot duration for epoch threshold
       const headFork = this.config.getForkName(newHead.slot);
-      if (delaySec < (SLOTS_PER_EPOCH * this.config.getSlotDurationMsForFork(headFork)) / 1000) {
+      if (delaySec < (SLOTS_PER_EPOCH * this.config.getSlotDurationMs(headFork)) / 1000) {
         this.metrics.importBlock.elapsedTimeTillBecomeHead.observe(delaySec);
         const cutOffSec = this.config.getAttestationDueMs(this.config.getForkName(blockSlot)) / 1000;
         if (delaySec > cutOffSec) {
