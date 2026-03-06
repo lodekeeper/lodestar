@@ -43,6 +43,10 @@ const FORK_CHOICE_ATT_EPOCH_LIMIT = 1;
  * Emit eventstream events for block contents events only for blocks that are recent enough to clock
  */
 const EVENTSTREAM_EMIT_RECENT_BLOCK_SLOTS = 64;
+/**
+ * Some post-Gloas range-sync paths don't carry an execution payload number, but fork choice API requires one.
+ */
+const EXECUTION_PAYLOAD_NUMBER_NOT_TRACKED = 0;
 
 /**
  * Imports a fully verified block into the chain state. Produces multiple permanent side-effects.
@@ -73,6 +77,7 @@ export async function importBlock(
     blockInput,
     postState,
     postEnvelopeState,
+    signedEnvelope,
     parentBlockSlot,
     executionStatus,
     dataAvailabilityStatus,
@@ -136,14 +141,21 @@ export async function importBlock(
   });
 
   if (postEnvelopeState !== null) {
+    const executionPayloadNumber = signedEnvelope?.message.payload.blockNumber ?? EXECUTION_PAYLOAD_NUMBER_NOT_TRACKED;
+
     this.regen.processPayloadState(postEnvelopeState);
     this.forkChoice.onExecutionPayload(
       blockRootHex,
       toRootHex(postEnvelopeState.latestBlockHash),
-      // TODO GLOAS: this is not right but we don't need to track it as part of consensus spec, lighthouse also does not track it
-      0,
+      executionPayloadNumber,
       toRootHex(postEnvelopeState.hashTreeRoot())
     );
+
+    if (signedEnvelope !== null) {
+      await this.db.executionPayloadEnvelope.put(signedEnvelope.message.beaconBlockRoot, signedEnvelope);
+      this.seenExecutionPayloadEnvelopes.add(blockRootHex, signedEnvelope.message.slot);
+    }
+
     this.logger.verbose("Added envelope state to block state cache", {
       slot: blockSlot,
       root: blockRootHex,

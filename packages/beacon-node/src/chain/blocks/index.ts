@@ -108,6 +108,7 @@ export async function processBlocks(
         blockInput: block,
         postState: postStates[i],
         postEnvelopeState: postEnvelopeStates.get(block.slot) ?? null,
+        signedEnvelope: envelopes?.get(block.slot) ?? null,
         parentBlockSlot: parentSlots[i],
         executionStatus: executionStatuses[i],
         // start supporting optimistic syncing/processing
