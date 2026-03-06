@@ -287,13 +287,16 @@ function getSegmentErrorResponse(
       const block = blocks[mayBeLVHIndex].getBlock();
       const signedEnvelope = envelopes?.get(block.message.slot) ?? null;
       const envelope = signedEnvelope?.message ?? null;
-      const executionBlockHash = isExecutionBlockBodyType(block.message.body)
-        ? toRootHex((block.message.body as bellatrix.BeaconBlockBody).executionPayload.blockHash)
-        : envelope
-          ? toRootHex(envelope.payload.blockHash)
-          : isGloasBeaconBlock(block.message)
-            ? toRootHex(block.message.body.signedExecutionPayloadBid.message.blockHash)
-            : null;
+      let executionBlockHash: RootHex | null;
+      if (isExecutionBlockBodyType(block.message.body)) {
+        executionBlockHash = toRootHex((block.message.body as bellatrix.BeaconBlockBody).executionPayload.blockHash);
+      } else if (envelope) {
+        executionBlockHash = toRootHex(envelope.payload.blockHash);
+      } else if (isGloasBeaconBlock(block.message)) {
+        executionBlockHash = toRootHex(block.message.body.signedExecutionPayloadBid.message.blockHash);
+      } else {
+        executionBlockHash = null;
+      }
       if (executionBlockHash !== null && executionBlockHash === lvhResponse.latestValidExecHash) {
         lvhFound = true;
         break;

@@ -7,7 +7,7 @@ import {
   DataAvailabilityStatus,
   computeEpochAtSlot,
 } from "@lodestar/state-transition";
-import type {IndexedAttestation, Slot, fulu} from "@lodestar/types";
+import type {IndexedAttestation, Slot, fulu, gloas} from "@lodestar/types";
 import {IBlockInput} from "./blockInput/types.js";
 
 export enum GossipedInputType {
@@ -92,6 +92,8 @@ export type FullyVerifiedBlock = {
   blockInput: IBlockInput;
   postState: CachedBeaconStateAllForks;
   postEnvelopeState: CachedBeaconStateGloas | null;
+  /** Signed envelope used to derive `postEnvelopeState` (if available in the incoming segment). */
+  signedEnvelope: gloas.SignedExecutionPayloadEnvelope | null;
   parentBlockSlot: Slot;
   proposerBalanceDelta: number;
   /**
