@@ -131,7 +131,10 @@ export class Batch {
   /**
    * Builds ByRange requests for block, blobs and columns
    */
-  private getRequests(blocks: IBlockInput[]): DownloadByRangeRequests {
+  private getRequests(
+    blocks: IBlockInput[],
+    envelopesOverride: Map<Slot, gloas.SignedExecutionPayloadEnvelope> | null = null
+  ): DownloadByRangeRequests {
     const withinValidRequestWindow = !isDaOutOfRange(
       this.config,
       this.forkName,
@@ -178,7 +181,8 @@ export class Batch {
     let dataStartSlot = this.startSlot;
     let envelopeStartSlot = this.startSlot;
     const neededColumns = new Set<number>();
-    const envelopesBySlot = this.state.envelopes ?? new Map<Slot, gloas.SignedExecutionPayloadEnvelope>();
+    const envelopesBySlot =
+      envelopesOverride ?? this.state.envelopes ?? new Map<Slot, gloas.SignedExecutionPayloadEnvelope>();
 
     // ensure blocks are in slot-wise order
     for (const blockInput of blocks) {
@@ -352,7 +356,7 @@ export class Batch {
     if (allComplete) {
       this.state = {status: BatchStatus.AwaitingProcessing, blocks, envelopes: envelopesMap};
     } else {
-      this.requests = this.getRequests(blocks);
+      this.requests = this.getRequests(blocks, envelopesMap);
       this.state = {status: BatchStatus.AwaitingDownload, blocks, envelopes: envelopesMap};
     }
 
