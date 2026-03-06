@@ -1217,7 +1217,12 @@ export class ForkChoice implements IForkChoice {
       return this.head;
     }
 
-    for (const block of this.protoArray.iterateAncestorNodes(this.head.blockRoot)) {
+    const canonicalHeadNode = this.protoArray.getNode(this.head.blockRoot, this.head.payloadStatus);
+    if (canonicalHeadNode === undefined) {
+      return null;
+    }
+
+    for (const block of this.protoArray.iterateAncestorNodesFromNode(canonicalHeadNode)) {
       if (block.blockRoot === blockRootHex) {
         return block;
       }
@@ -1235,7 +1240,12 @@ export class ForkChoice implements IForkChoice {
       return this.head;
     }
 
-    for (const block of this.protoArray.iterateAncestorNodes(this.head.blockRoot)) {
+    const canonicalHeadNode = this.protoArray.getNode(this.head.blockRoot, this.head.payloadStatus);
+    if (canonicalHeadNode === undefined) {
+      return null;
+    }
+
+    for (const block of this.protoArray.iterateAncestorNodesFromNode(canonicalHeadNode)) {
       if (block.slot === slot) {
         return block;
       }
@@ -1248,7 +1258,12 @@ export class ForkChoice implements IForkChoice {
       return this.head;
     }
 
-    for (const block of this.protoArray.iterateAncestorNodes(this.head.blockRoot)) {
+    const canonicalHeadNode = this.protoArray.getNode(this.head.blockRoot, this.head.payloadStatus);
+    if (canonicalHeadNode === undefined) {
+      return null;
+    }
+
+    for (const block of this.protoArray.iterateAncestorNodesFromNode(canonicalHeadNode)) {
       if (slot >= block.slot) {
         return block;
       }
