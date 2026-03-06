@@ -37,7 +37,7 @@ describe("beacon-node / network / reqresp / handlers / executionPayloadEnvelopes
       },
       forkChoice: {
         getFinalizedCheckpointSlot: () => 64,
-        getHeadRoot: () => "0xhead",
+        getHead: () => ({blockRoot: toRootHex(rootWithByte(66)), slot: 66}),
         getBlockHexDefaultStatus: () => ({slot: 66, blockRoot: toRootHex(rootWithByte(66))}),
         getAllAncestorBlocks: () => [
           {slot: 66, blockRoot: toRootHex(rootWithByte(66))},
@@ -135,7 +135,7 @@ describe("beacon-node / network / reqresp / handlers / executionPayloadEnvelopes
       },
       forkChoice: {
         getFinalizedCheckpointSlot: () => 64,
-        getHeadRoot: () => "0xhead",
+        getHead: () => ({blockRoot: toRootHex(rootWithByte(66)), slot: 66}),
         getBlockHexDefaultStatus: () => ({slot: 66, blockRoot: toRootHex(rootWithByte(66))}),
         getAllAncestorBlocks: () => [
           {slot: 65, blockRoot: toRootHex(rootWithByte(65))},
