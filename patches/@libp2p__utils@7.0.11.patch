@@ -23,3 +23,49 @@ index 94264623bb640f5b6b55209b33f0c5e25bdc66be..b264b0fc1a0db733422cc8006b8a2ebf
      const time = Date.now() - signal.start
  
      if (signal.aborted) {
+diff --git a/src/repeating-task.ts b/src/repeating-task.ts
+--- a/src/repeating-task.ts
++++ b/src/repeating-task.ts
+@@ -77,8 +77,10 @@
+       signal: shutdownController.signal
+     }
+ 
++    let signal: ReturnType<typeof anySignal> | undefined
++
+     if (options?.timeout != null) {
+-      const signal = anySignal([shutdownController.signal, AbortSignal.timeout(options.timeout)])
++      signal = anySignal([shutdownController.signal, AbortSignal.timeout(options.timeout)])
+       setMaxListeners(Infinity, signal)
+ 
+       opts.signal = signal
+@@ -91,6 +93,8 @@
+     })
+       .catch(() => {})
+       .finally(() => {
++        signal?.clear()
++
+         running = false
+ 
+         if (shutdownController.signal.aborted) {
+diff --git a/dist/src/repeating-task.js b/dist/src/repeating-task.js
+--- a/dist/src/repeating-task.js
++++ b/dist/src/repeating-task.js
+@@ -9,8 +9,9 @@
+         const opts = {
+             signal: shutdownController.signal
+         };
++        let signal;
+         if (options?.timeout != null) {
+-            const signal = anySignal([shutdownController.signal, AbortSignal.timeout(options.timeout)]);
++            signal = anySignal([shutdownController.signal, AbortSignal.timeout(options.timeout)]);
+             setMaxListeners(Infinity, signal);
+             opts.signal = signal;
+         }
+@@ -20,6 +21,7 @@
+         })
+             .catch(() => { })
+             .finally(() => {
++            signal?.clear();
+             running = false;
+             if (shutdownController.signal.aborted) {
+                 // task has been cancelled, bail

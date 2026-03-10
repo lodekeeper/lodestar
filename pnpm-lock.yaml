@@ -29,7 +29,7 @@ patchedDependencies:
     hash: 5fa2d2e0fe188609c272f1f93ff8c1b0f4fb500f46f6ee2b5b455ffc79371d24
     path: patches/@libp2p__prometheus-metrics@5.0.11.patch
   '@libp2p/utils@7.0.11':
-    hash: e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c
+    hash: 01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04
     path: patches/@libp2p__utils@7.0.11.patch
   libp2p@3.1.4:
     hash: 395d04612b916ced912c486583bd8eb193d5af6de64b3c51276b1b91556dc165
@@ -398,7 +398,7 @@ importers:
         version: 6.2.2
       '@libp2p/utils':
         specifier: ^7.0.11
-        version: 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+        version: 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@lodestar/spec-test-util':
         specifier: workspace:^
         version: link:../spec-test-util
@@ -902,7 +902,7 @@ importers:
         version: 3.1.0
       '@libp2p/utils':
         specifier: ^7.0.11
-        version: 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+        version: 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@lodestar/config':
         specifier: workspace:^
         version: link:../config
@@ -7763,7 +7763,7 @@ snapshots:
       '@libp2p/crypto': 5.1.13
       '@libp2p/interface': 3.1.0
       '@libp2p/peer-id': 6.0.4
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@noble/ciphers': 2.1.1
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -8898,7 +8898,7 @@ snapshots:
       '@libp2p/interface': 3.1.0
       '@libp2p/interface-internal': 3.0.11
       '@libp2p/peer-id': 6.0.4
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@multiformats/multiaddr': 13.0.1
       denque: 2.1.0
       it-length-prefixed: 10.0.1
@@ -8916,7 +8916,7 @@ snapshots:
       '@libp2p/interface-internal': 3.0.11
       '@libp2p/peer-id': 6.0.4
       '@libp2p/peer-record': 9.0.5
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@multiformats/multiaddr': 13.0.1
       '@multiformats/multiaddr-matcher': 3.0.1
       it-drain: 3.0.10
@@ -8955,7 +8955,7 @@ snapshots:
       '@libp2p/interface': 3.1.0
       '@libp2p/interface-internal': 3.0.11
       '@libp2p/peer-id': 6.0.4
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@multiformats/multiaddr': 13.0.1
       '@types/multicast-dns': 7.2.4
       dns-packet: 5.6.1
@@ -8965,7 +8965,7 @@ snapshots:
   '@libp2p/mplex@12.0.12':
     dependencies:
       '@libp2p/interface': 3.1.0
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       it-pushable: 3.2.3
       uint8-varint: 2.0.4
       uint8arraylist: 2.4.8
@@ -8974,7 +8974,7 @@ snapshots:
   '@libp2p/multistream-select@7.0.11':
     dependencies:
       '@libp2p/interface': 3.1.0
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       it-length-prefixed: 10.0.1
       uint8arraylist: 2.4.8
       uint8arrays: 5.1.0
@@ -8983,7 +8983,7 @@ snapshots:
     dependencies:
       '@libp2p/interface': 3.1.0
       '@libp2p/peer-id': 6.0.4
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       multiformats: 13.4.2
 
   '@libp2p/peer-id@6.0.4':
@@ -9030,7 +9030,7 @@ snapshots:
   '@libp2p/tcp@11.0.11':
     dependencies:
       '@libp2p/interface': 3.1.0
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@multiformats/multiaddr': 13.0.1
       '@multiformats/multiaddr-matcher': 3.0.1
       '@types/sinon': 20.0.0
@@ -9039,7 +9039,7 @@ snapshots:
       progress-events: 1.0.1
       uint8arraylist: 2.4.8
 
-  '@libp2p/utils@7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)':
+  '@libp2p/utils@7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)':
     dependencies:
       '@chainsafe/is-ip': 2.1.0
       '@chainsafe/netmask': 2.0.0
@@ -12328,7 +12328,7 @@ snapshots:
       '@libp2p/peer-collections': 7.0.11
       '@libp2p/peer-id': 6.0.4
       '@libp2p/peer-store': 12.0.11
-      '@libp2p/utils': 7.0.11(patch_hash=e58b3a3dfb2bf9e262a92e036ee16b03c679f6a327eb65562ef0070cc85f247c)
+      '@libp2p/utils': 7.0.11(patch_hash=01a196cd455ca72f885219b208041278f1f0b2ead127136f0185898bf6708d04)
       '@multiformats/dns': 1.0.13
       '@multiformats/multiaddr': 13.0.1
       '@multiformats/multiaddr-matcher': 3.0.1
