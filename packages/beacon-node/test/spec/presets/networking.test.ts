@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {expect, it} from "vitest";
 import {config} from "@lodestar/config/default";
@@ -74,6 +75,16 @@ const networking: TestRunnerCustom = (fork, testHandler, testSuite, testSuiteDir
   }
 };
 
-specTestIterator(path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET), {
+function resolveNetworkingSpecRoot(): string {
+  const overrideRoot = process.env.LODESTAR_NETWORKING_REFTESTS_DIR;
+  if (!overrideRoot) {
+    return path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET);
+  }
+
+  const expandedRoot = overrideRoot.startsWith("~/") ? path.join(os.homedir(), overrideRoot.slice(2)) : overrideRoot;
+  return path.join(path.resolve(expandedRoot), ACTIVE_PRESET);
+}
+
+specTestIterator(resolveNetworkingSpecRoot(), {
   networking: {type: RunnerType.custom, fn: networking},
 });

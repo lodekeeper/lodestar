@@ -13,6 +13,7 @@ import {
   getSeenAttDataKeyFromSignedAggregateAndProof,
   validateApiAttestation,
   validateGossipAttestationsSameAttData,
+  verifyPropagationSlotRange,
 } from "../../../../../src/chain/validation/index.js";
 import {getAttDataFromAttestationSerialized} from "../../../../../src/util/sszBytes.js";
 import {memoOnce} from "../../../../utils/cache.js";
@@ -97,6 +98,42 @@ describe("validateAttestation", () => {
       },
       AttestationErrorCode.PAST_SLOT
     );
+  });
+
+  it("verifyPropagationSlotRange accepts the exact pre-deneb old-boundary", () => {
+    const chain = {
+      config: {
+        MAXIMUM_GOSSIP_CLOCK_DISPARITY: 500,
+        ATTESTATION_PROPAGATION_SLOT_RANGE: 32,
+        SLOT_DURATION_MS: 6000,
+      },
+      clock: {
+        currentSlot: 34,
+        slotWithFutureTolerance: () => 34,
+        slotWithPastTolerance: () => 34,
+        isCurrentSlotGivenGossipDisparity: (slot: number) => slot === 33 || slot === 34,
+      },
+    } as unknown as Pick<IBeaconChain, "config" | "clock"> as IBeaconChain;
+
+    expect(() => verifyPropagationSlotRange(ForkName.phase0, chain, 1)).not.toThrow();
+  });
+
+  it("verifyPropagationSlotRange rejects pre-deneb just past the old-boundary", () => {
+    const chain = {
+      config: {
+        MAXIMUM_GOSSIP_CLOCK_DISPARITY: 500,
+        ATTESTATION_PROPAGATION_SLOT_RANGE: 32,
+        SLOT_DURATION_MS: 6000,
+      },
+      clock: {
+        currentSlot: 34,
+        slotWithFutureTolerance: () => 34,
+        slotWithPastTolerance: () => 34,
+        isCurrentSlotGivenGossipDisparity: (slot: number) => slot === 34,
+      },
+    } as unknown as Pick<IBeaconChain, "config" | "clock"> as IBeaconChain;
+
+    expect(() => verifyPropagationSlotRange(ForkName.phase0, chain, 1)).toThrowError(LodestarError);
   });
 
   it("FUTURE_SLOT", async () => {
