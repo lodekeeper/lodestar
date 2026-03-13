@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {describe, it} from "vitest";
-import {ForkName} from "@lodestar/params";
+import {ForkName, forkAll} from "@lodestar/params";
 import {describeDirectorySpecTest} from "@lodestar/spec-test-util";
 import {RunnerType, TestRunner} from "./types.js";
 
@@ -117,6 +117,12 @@ export function specTestIterator(
     ) {
       continue;
     }
+
+    // Skip fork directories not yet supported by Lodestar (e.g. future forks in spec tests)
+    if (!forkAll.includes(forkStr as ForkName)) {
+      continue;
+    }
+
     const fork = forkStr as ForkName;
 
     const forkDirpath = path.join(configDirpath, forkStr);
@@ -150,8 +156,6 @@ export function specTestIterator(
 
           if (opts?.skippedTestSuites?.some((skippedMatch) => testId.match(skippedMatch))) {
             displaySkipTest(testId);
-          } else if (fork === undefined) {
-            displayFailTest(testId, `Unknown fork ${forkStr}`);
           } else {
             const testSuiteDirpath = path.join(testHandlerDirpath, testSuite);
             // Specific logic for ssz_static since it has one extra level of directories
@@ -176,14 +180,6 @@ export function specTestIterator(
       }
     }
   }
-}
-
-function displayFailTest(testId: string, msg: string): void {
-  describe(testId, () => {
-    it(testId, () => {
-      throw Error(msg);
-    });
-  });
 }
 
 function displaySkipTest(testId: string): void {
