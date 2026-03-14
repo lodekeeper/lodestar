@@ -17,7 +17,7 @@ import {AttesterSlashing, altair, bellatrix, capella, electra, gloas, phase0, ss
 import {createCachedBeaconStateTest} from "../../utils/cachedBeaconState.js";
 import {ethereumConsensusSpecsTests} from "../specTestVersioning.js";
 import {expectEqualBeaconState, inputTypeSszTreeViewDU} from "../utils/expectEqualBeaconState.js";
-import {specTestIterator} from "../utils/specTestIterator.js";
+import {defaultSkipOpts, specTestIterator} from "../utils/specTestIterator.js";
 import {BaseSpecTest, RunnerType, TestRunnerFn, shouldVerify} from "../utils/types.js";
 
 // Define above to re-use in sync_aggregate and sync_aggregate_random
@@ -187,6 +187,15 @@ const operations: TestRunnerFn<OperationsTestCase, BeaconStateAllForks> = (fork,
   };
 };
 
-specTestIterator(path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET), {
-  operations: {type: RunnerType.default, fn: operations},
-});
+specTestIterator(
+  path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET),
+  {
+    operations: {type: RunnerType.default, fn: operations},
+  },
+  {
+    ...defaultSkipOpts,
+    // builder_voluntary_exit__success: spec test vector bug — missing voluntary_exit input yield
+    // See: https://github.com/ethereum/consensus-specs/pull/4908
+    skippedTests: [...(defaultSkipOpts.skippedTests ?? []), /builder_voluntary_exit__success/],
+  }
+);
