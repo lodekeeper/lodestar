@@ -895,7 +895,7 @@ export class ForkChoice implements IForkChoice {
     let payloadStatus: PayloadStatus;
 
     // We need to retrieve block to check if it's Gloas and to compare slot
-    // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/fork-choice.md#new-is_supporting_vote
+    // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/fork-choice.md#new-is_supporting_vote
     const block = this.getBlockHexDefaultStatus(blockRootHex);
 
     if (block && isGloasBlock(block)) {
@@ -964,8 +964,13 @@ export class ForkChoice implements IForkChoice {
    * Updates the PTC votes for multiple validators attesting to a block
    * Spec: gloas/fork-choice.md#new-on_payload_attestation_message
    */
-  notifyPtcMessages(blockRoot: RootHex, ptcIndices: number[], payloadPresent: boolean): void {
-    this.protoArray.notifyPtcMessages(blockRoot, ptcIndices, payloadPresent);
+  notifyPtcMessages(
+    blockRoot: RootHex,
+    ptcIndices: number[],
+    payloadPresent: boolean,
+    blobDataAvailable: boolean
+  ): void {
+    this.protoArray.notifyPtcMessages(blockRoot, ptcIndices, payloadPresent, blobDataAvailable);
   }
 
   /**
@@ -1054,6 +1059,14 @@ export class ForkChoice implements IForkChoice {
    */
   hasBlockHexUnsafe(blockRoot: RootHex): boolean {
     return this.protoArray.hasBlock(blockRoot);
+  }
+
+  /**
+   * Check if an execution payload with the given block hash has been seen.
+   * Spec: gloas/p2p-interface.md — parent execution payload must have been seen
+   */
+  hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
+    return this.protoArray.hasExecutionPayload(executionPayloadBlockHash);
   }
 
   /**
@@ -1671,6 +1684,22 @@ export class ForkChoice implements IForkChoice {
           index: attestationData.index,
         },
       });
+    }
+
+    // [New in Gloas:EIP7732]
+    // If attesting for a full node (index=1), the payload must be known (locally available)
+    // Spec: gloas/fork-choice.md#modified-validate_on_attestation
+    if (isGloasBlock(block) && attestationData.index === 1) {
+      const fullVariant = this.protoArray.getNodeIndexByRootAndStatus(beaconBlockRootHex, PayloadStatus.FULL);
+      if (fullVariant === undefined) {
+        throw new ForkChoiceError({
+          code: ForkChoiceErrorCode.INVALID_ATTESTATION,
+          err: {
+            code: InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS,
+            beaconBlockRoot: beaconBlockRootHex,
+          },
+        });
+      }
     }
 
     this.validatedAttestationDatas.add(attDataRoot);

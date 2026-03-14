@@ -21,6 +21,12 @@ import {
  */
 const PAYLOAD_TIMELY_THRESHOLD = Math.floor(PTC_SIZE / 2);
 
+/**
+ * Threshold for payload data availability (>50% of PTC must vote)
+ * Spec: gloas/fork-choice.md (DATA_AVAILABILITY_TIMELY_THRESHOLD = PTC_SIZE // 2)
+ */
+const DATA_AVAILABILITY_TIMELY_THRESHOLD = Math.floor(PTC_SIZE / 2);
+
 export const DEFAULT_PRUNE_THRESHOLD = 0;
 type ProposerBoost = {root: RootHex; score: number};
 
@@ -29,11 +35,12 @@ const ZERO_HASH_HEX = toRootHex(Buffer.alloc(32, 0));
 /** Pre-Gloas: single element, FULL index (for backward compatibility) */
 type PreGloasVariantIndex = number;
 /**
- * Post-Gloas: array length is 2 or 3
- *   - Length 2: [PENDING_INDEX, EMPTY_INDEX] when payload hasn't arrived yet
- *   - Length 3: [PENDING_INDEX, EMPTY_INDEX, FULL_INDEX] when payload has arrived
+ * Post-Gloas: always length 3, indexed by PayloadStatus enum value
+ *   - [EMPTY_INDEX, FULL_INDEX | undefined, PENDING_INDEX]
+ *   - PayloadStatus.EMPTY=0, PayloadStatus.FULL=1, PayloadStatus.PENDING=2
+ *   - FULL starts as undefined until execution payload arrives
  */
-type GloasVariantIndices = [number, number] | [number, number, number];
+type GloasVariantIndices = [number, number | undefined, number];
 type VariantIndices = PreGloasVariantIndex | GloasVariantIndices;
 
 export class ProtoArray {
@@ -48,10 +55,10 @@ export class ProtoArray {
   /**
    * Maps block root to array of node indices for each payload status variant
    *
-   * Array structure: [PENDING, EMPTY, FULL] where indices correspond to PayloadStatus enum values
-   * - number[0] = PENDING variant index (PayloadStatus.PENDING = 0)
-   * - number[1] = EMPTY variant index (PayloadStatus.EMPTY = 1)
-   * - number[2] = FULL variant index (PayloadStatus.FULL = 2)
+   * Array structure: [EMPTY, FULL, PENDING] where indices correspond to PayloadStatus enum values
+   * - number[0] = EMPTY variant index (PayloadStatus.EMPTY = 0)
+   * - number[1] = FULL variant index (PayloadStatus.FULL = 1)
+   * - number[2] = PENDING variant index (PayloadStatus.PENDING = 2)
    *
    * Note: undefined array elements indicate that variant doesn't exist for this block
    */
@@ -61,14 +68,24 @@ export class ProtoArray {
   private previousProposerBoost: ProposerBoost | null = null;
 
   /**
-   * PTC (Payload Timeliness Committee) votes per block as bitvectors
+   * Payload timeliness votes per block as bitvectors
    * Maps block root to BitArray of PTC_SIZE bits (512 mainnet, 2 minimal)
-   * Spec: gloas/fork-choice.md#modified-store (line 148)
+   * Spec: gloas/fork-choice.md#modified-store (payload_timeliness_vote)
    *
    * Bit i is set if PTC member i voted payload_present=true
    * Used by is_payload_timely() to determine if payload is timely
    */
-  private ptcVotes = new Map<RootHex, BitArray>();
+  private payloadTimelinessVotes = new Map<RootHex, BitArray>();
+
+  /**
+   * Payload data availability votes per block as bitvectors
+   * Maps block root to BitArray of PTC_SIZE bits (512 mainnet, 2 minimal)
+   * Spec: gloas/fork-choice.md#modified-store (payload_data_availability_vote)
+   *
+   * Bit i is set if PTC member i voted blob_data_available=true
+   * Used by is_payload_data_available() to determine if blob data is available
+   */
+  private payloadDataAvailabilityVotes = new Map<RootHex, BitArray>();
 
   constructor({
     pruneThreshold,
@@ -439,11 +456,11 @@ export class ProtoArray {
       // Check if parent exists by getting variants array
       const parentVariants = this.indices.get(block.parentRoot);
       if (parentVariants != null) {
-        const anyParentIndex = Array.isArray(parentVariants) ? parentVariants[0] : parentVariants;
+        const anyParentIndex = Array.isArray(parentVariants) ? parentVariants[PayloadStatus.EMPTY] : parentVariants;
         const anyParentNode = this.nodes[anyParentIndex];
 
         if (!isGloasBlock(anyParentNode)) {
-          // Fork transition: parent is pre-Gloas, so it only has FULL variant at variants[0]
+          // Fork transition: parent is pre-Gloas, so it only has FULL variant
           parentIndex = anyParentIndex;
         } else {
           // Both blocks are Gloas: determine which parent payload status to extend
@@ -479,9 +496,9 @@ export class ProtoArray {
       const emptyIndex = this.nodes.length;
       this.nodes.push(emptyNode);
 
-      // Store both variants in the indices array
-      // [PENDING, EMPTY, undefined] - FULL will be added later if payload arrives
-      this.indices.set(block.blockRoot, [pendingIndex, emptyIndex]);
+      // Store variants in the indices array indexed by PayloadStatus enum values
+      // [EMPTY=0, FULL=1(undefined), PENDING=2] - FULL will be added when payload arrives
+      this.indices.set(block.blockRoot, [emptyIndex, undefined, pendingIndex]);
 
       // Update bestChild pointers
       if (parentIndex !== undefined) {
@@ -495,9 +512,10 @@ export class ProtoArray {
       // Update bestChild for PENDING → EMPTY edge
       this.maybeUpdateBestChildAndDescendant(pendingIndex, emptyIndex, currentSlot, proposerBoostRoot);
 
-      // Initialize PTC votes for this block (all false initially)
-      // Spec: gloas/fork-choice.md#modified-on_block (line 645)
-      this.ptcVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
+      // Initialize both vote maps for this block (all false initially)
+      // Spec: gloas/fork-choice.md#modified-on_block
+      this.payloadTimelinessVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
+      this.payloadDataAvailabilityVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
     } else {
       // Pre-Gloas: Only create FULL node (payload embedded in block)
       const node: ProtoNode = {
@@ -612,11 +630,18 @@ export class ProtoArray {
    *
    * @param blockRoot - The beacon block root being attested
    * @param ptcIndices - Array of PTC committee indices that voted (0..PTC_SIZE-1)
-   * @param payloadPresent - Whether the validators attest the payload is present
+   * @param payloadPresent - Whether the validators attest the payload is present (timeliness)
+   * @param blobDataAvailable - Whether the validators attest blob data is available
    */
-  notifyPtcMessages(blockRoot: RootHex, ptcIndices: number[], payloadPresent: boolean): void {
-    const votes = this.ptcVotes.get(blockRoot);
-    if (votes === undefined) {
+  notifyPtcMessages(
+    blockRoot: RootHex,
+    ptcIndices: number[],
+    payloadPresent: boolean,
+    blobDataAvailable: boolean
+  ): void {
+    const timelinessVotes = this.payloadTimelinessVotes.get(blockRoot);
+    const dataAvailabilityVotes = this.payloadDataAvailabilityVotes.get(blockRoot);
+    if (timelinessVotes === undefined || dataAvailabilityVotes === undefined) {
       // Block not found or not a Gloas block, ignore
       return;
     }
@@ -626,7 +651,8 @@ export class ProtoArray {
         throw new Error(`Invalid PTC index: ${ptcIndex}, must be 0..${PTC_SIZE - 1}`);
       }
 
-      votes.set(ptcIndex, payloadPresent);
+      timelinessVotes.set(ptcIndex, payloadPresent);
+      dataAvailabilityVotes.set(ptcIndex, blobDataAvailable);
     }
   }
 
@@ -642,7 +668,7 @@ export class ProtoArray {
    * @param blockRoot - The beacon block root to check
    */
   isPayloadTimely(blockRoot: RootHex): boolean {
-    const votes = this.ptcVotes.get(blockRoot);
+    const votes = this.payloadTimelinessVotes.get(blockRoot);
     if (votes === undefined) {
       // Block not found or not a Gloas block
       return false;
@@ -658,6 +684,35 @@ export class ProtoArray {
     // Count votes for payload_present=true
     const yesVotes = bitCount(votes.uint8Array);
     return yesVotes > PAYLOAD_TIMELY_THRESHOLD;
+  }
+
+  /**
+   * Check if blob data for a block is available
+   * Spec: gloas/fork-choice.md#new-is_payload_data_available
+   *
+   * Returns true if:
+   * 1. Block has data availability votes tracked
+   * 2. Payload is locally available (FULL variant exists in proto array)
+   * 3. More than DATA_AVAILABILITY_TIMELY_THRESHOLD (>50% of PTC) voted blob_data_available=true
+   *
+   * @param blockRoot - The beacon block root to check
+   */
+  isPayloadDataAvailable(blockRoot: RootHex): boolean {
+    const votes = this.payloadDataAvailabilityVotes.get(blockRoot);
+    if (votes === undefined) {
+      // Block not found or not a Gloas block
+      return false;
+    }
+
+    // If payload is not locally available, blob data is not considered available
+    const fullNodeIndex = this.getNodeIndexByRootAndStatus(blockRoot, PayloadStatus.FULL);
+    if (fullNodeIndex === undefined) {
+      return false;
+    }
+
+    // Count votes for blob_data_available=true
+    const yesVotes = bitCount(votes.uint8Array);
+    return yesVotes > DATA_AVAILABILITY_TIMELY_THRESHOLD;
   }
 
   /**
@@ -684,8 +739,8 @@ export class ProtoArray {
    * @param proposerBoostRoot - Current proposer boost root (from ForkChoice)
    */
   shouldExtendPayload(blockRoot: RootHex, proposerBoostRoot: RootHex | null): boolean {
-    // Condition 1: Payload is timely
-    if (this.isPayloadTimely(blockRoot)) {
+    // Condition 1: Payload is timely AND blob data is available
+    if (this.isPayloadTimely(blockRoot) && this.isPayloadDataAvailable(blockRoot)) {
       return true;
     }
 
@@ -1083,7 +1138,8 @@ export class ProtoArray {
       this.indices.delete(root);
       // Prune PTC votes for this block to prevent memory leak
       // Spec: gloas/fork-choice.md (implicit - finalized blocks don't need PTC votes)
-      this.ptcVotes.delete(root);
+      this.payloadTimelinessVotes.delete(root);
+      this.payloadDataAvailabilityVotes.delete(root);
     }
 
     // Store nodes prior to finalization
@@ -1391,7 +1447,7 @@ export class ProtoArray {
    * ### Specification
    *
    * Modified for Gloas to return node identifier instead of just root:
-   * https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/fork-choice.md#modified-get_ancestor
+   * https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/fork-choice.md#modified-get_ancestor
    *
    * Pre-Gloas: Returns (root, PAYLOAD_STATUS_FULL)
    * Gloas: Returns (root, payloadStatus) based on actual node state
@@ -1406,13 +1462,11 @@ export class ProtoArray {
       });
     }
 
-    const blockIndex = Array.isArray(variantOrArr) ? variantOrArr[0] : variantOrArr;
+    const blockIndex = Array.isArray(variantOrArr) ? variantOrArr[PayloadStatus.EMPTY] : variantOrArr;
     const block = this.nodes[blockIndex];
 
-    // If block is at or before queried slot, return PENDING variant (or FULL for pre-Gloas)
+    // If block is at or before queried slot, return any variant (EMPTY for Gloas, FULL for pre-Gloas)
     if (block.slot <= ancestorSlot) {
-      // For pre-Gloas: only FULL exists at variants[0]
-      // For Gloas: PENDING is at variants[0]
       return block;
     }
 
@@ -1669,6 +1723,33 @@ export class ProtoArray {
    */
   hasBlock(blockRoot: RootHex): boolean {
     return this.getDefaultNodeIndex(blockRoot) !== undefined;
+  }
+
+  /**
+   * Check if an execution payload with the given block hash has been seen.
+   * Looks through all nodes with FULL variant status for a matching executionPayloadBlockHash.
+   * Used for Gloas gossip validation: parent execution payload must have been seen.
+   */
+  hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
+    for (const [, variantOrArr] of this.indices) {
+      if (!Array.isArray(variantOrArr)) {
+        // Pre-Gloas: check directly
+        const node = this.nodes[variantOrArr];
+        if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
+          return true;
+        }
+      } else {
+        // Gloas: check FULL variant if it exists
+        const fullIndex = variantOrArr[PayloadStatus.FULL];
+        if (fullIndex !== undefined) {
+          const node = this.nodes[fullIndex];
+          if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /**

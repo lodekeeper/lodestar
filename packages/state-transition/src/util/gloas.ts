@@ -1,3 +1,4 @@
+import {BeaconConfig} from "@lodestar/config";
 import {
   BUILDER_INDEX_FLAG,
   BUILDER_PAYMENT_THRESHOLD_DENOMINATOR,
@@ -8,13 +9,42 @@ import {
   MIN_DEPOSIT_AMOUNT,
   SLOTS_PER_EPOCH,
 } from "@lodestar/params";
-import {BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
+import {BLSPubkey, BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
 import {AttestationData} from "@lodestar/types/phase0";
 import {byteArrayEquals} from "@lodestar/utils";
+import {isValidDepositSignature} from "../block/processDeposit.js";
 import {CachedBeaconStateGloas} from "../types.js";
 import {getBlockRootAtSlot} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
 import {RootCache} from "./rootCache.js";
+
+/**
+ * Check if a pending deposit with a valid signature is in the queue for the given pubkey.
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-is_pending_validator
+ *
+ * Note: This function naively revalidates deposit signatures on every call.
+ * Implementations SHOULD cache verification results to avoid repeated work.
+ */
+export function isPendingValidator(config: BeaconConfig, state: CachedBeaconStateGloas, pubkey: BLSPubkey): boolean {
+  for (let i = 0; i < state.pendingDeposits.length; i++) {
+    const pendingDeposit = state.pendingDeposits.getReadonly(i);
+    if (!byteArrayEquals(pendingDeposit.pubkey, pubkey)) {
+      continue;
+    }
+    if (
+      isValidDepositSignature(
+        config,
+        pendingDeposit.pubkey,
+        pendingDeposit.withdrawalCredentials,
+        pendingDeposit.amount,
+        pendingDeposit.signature
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
@@ -35,7 +65,7 @@ function hasBuilderIndexFlag(index: number): boolean {
 
 /**
  * Check if a validator index represents a builder (has the builder flag set).
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-is_builder_index
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-is_builder_index
  */
 export function isBuilderIndex(validatorIndex: number): boolean {
   // Note: Can't use bitwise AND (&) because BUILDER_INDEX_FLAG exceeds 32 bits in JS bitwise operations.
@@ -44,7 +74,7 @@ export function isBuilderIndex(validatorIndex: number): boolean {
 
 /**
  * Convert a builder index to a flagged validator index for use in Withdrawal containers.
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-convert_builder_index_to_validator_index
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-convert_builder_index_to_validator_index
  */
 export function convertBuilderIndexToValidatorIndex(builderIndex: BuilderIndex): ValidatorIndex {
   // Note: Can't use bitwise OR (|) because BUILDER_INDEX_FLAG exceeds 32 bits in JS bitwise operations.
@@ -53,7 +83,7 @@ export function convertBuilderIndexToValidatorIndex(builderIndex: BuilderIndex):
 
 /**
  * Convert a flagged validator index back to a builder index.
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-convert_validator_index_to_builder_index
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-convert_validator_index_to_builder_index
  */
 export function convertValidatorIndexToBuilderIndex(validatorIndex: ValidatorIndex): BuilderIndex {
   // Note: Can't use bitwise AND (&) because BUILDER_INDEX_FLAG exceeds 32 bits in JS bitwise operations.
@@ -62,7 +92,7 @@ export function convertValidatorIndexToBuilderIndex(validatorIndex: ValidatorInd
 
 /**
  * Check if a builder is active (deposited and not yet withdrawable).
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#isactivebuilder
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#isactivebuilder
  */
 export function isActiveBuilder(builder: gloas.Builder, finalizedEpoch: Epoch): boolean {
   return builder.depositEpoch < finalizedEpoch && builder.withdrawableEpoch === FAR_FUTURE_EPOCH;
@@ -70,7 +100,7 @@ export function isActiveBuilder(builder: gloas.Builder, finalizedEpoch: Epoch): 
 
 /**
  * Get the total pending balance to withdraw for a builder (from withdrawals + payments).
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-get_pending_balance_to_withdraw_for_builder
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-get_pending_balance_to_withdraw_for_builder
  */
 export function getPendingBalanceToWithdrawForBuilder(
   state: CachedBeaconStateGloas,
@@ -99,7 +129,7 @@ export function getPendingBalanceToWithdrawForBuilder(
 
 /**
  * Check if a builder has sufficient balance to cover a bid amount.
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-can_builder_cover_bid
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-can_builder_cover_bid
  */
 export function canBuilderCoverBid(
   state: CachedBeaconStateGloas,
@@ -119,7 +149,7 @@ export function canBuilderCoverBid(
 
 /**
  * Initiate a builder exit by setting their withdrawable epoch.
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-initiate_builder_exit
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-initiate_builder_exit
  */
 export function initiateBuilderExit(state: CachedBeaconStateGloas, builderIndex: BuilderIndex): void {
   const builder = state.builders.get(builderIndex);

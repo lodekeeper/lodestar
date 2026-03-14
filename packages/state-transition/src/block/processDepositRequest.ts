@@ -1,13 +1,13 @@
 import {FAR_FUTURE_EPOCH, ForkSeq, UNSET_DEPOSIT_REQUESTS_START_INDEX} from "@lodestar/params";
 import {BLSPubkey, Bytes32, UintNum64, electra, ssz} from "@lodestar/types";
 import {CachedBeaconStateElectra, CachedBeaconStateGloas} from "../types.js";
-import {findBuilderIndexByPubkey, isBuilderWithdrawalCredential} from "../util/gloas.js";
+import {findBuilderIndexByPubkey, isBuilderWithdrawalCredential, isPendingValidator} from "../util/gloas.js";
 import {computeEpochAtSlot, isValidatorKnown} from "../util/index.js";
 import {isValidDepositSignature} from "./processDeposit.js";
 
 /**
  * Apply a deposit for a builder. Either increases balance for existing builder or adds new builder to registry.
- * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.1/specs/gloas/beacon-chain.md#new-apply_deposit_for_builder
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-apply_deposit_for_builder
  */
 export function applyDepositForBuilder(
   state: CachedBeaconStateGloas,
@@ -93,8 +93,9 @@ export function processDepositRequest(
     const isValidator = isValidatorKnown(state, validatorIndex);
     const isBuilderPrefix = isBuilderWithdrawalCredential(withdrawalCredentials);
 
-    // Route to builder if it's an existing builder OR has builder prefix and is not a validator
-    if (isBuilder || (isBuilderPrefix && !isValidator)) {
+    // Route to builder if it's an existing builder OR has builder prefix and is not a validator/pending validator
+    // Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#modified-process_deposit_request
+    if (isBuilder || (isBuilderPrefix && !isValidator && !isPendingValidator(state.config, stateGloas, pubkey))) {
       // Apply builder deposits immediately
       applyDepositForBuilder(stateGloas, pubkey, withdrawalCredentials, amount, signature, state.slot);
       return;

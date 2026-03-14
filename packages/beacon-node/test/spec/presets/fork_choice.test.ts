@@ -509,7 +509,7 @@ const forkChoiceTest =
         // integrated
         shouldSkip: (_testcase, name, _index) =>
           name.includes("invalid_incorrect_proof") ||
-          // TODO GLOAS: Proposer boost specs have been changed retroactively in v1.7.0-alpha.1,
+          // TODO GLOAS: Proposer boost specs have been changed retroactively in v1.7.0-alpha.3,
           // and these tests are failing until we update our implementation.
           name.includes("voting_source_beyond_two_epoch") ||
           name.includes("justified_update_always_if_better") ||

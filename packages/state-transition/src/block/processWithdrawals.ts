@@ -80,7 +80,7 @@ export function processWithdrawals(
   applyWithdrawals(state, expectedWithdrawals);
 
   if (fork >= ForkSeq.electra) {
-    // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/electra/beacon-chain.md#new-update_pending_partial_withdrawals
+    // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/electra/beacon-chain.md#new-update_pending_partial_withdrawals
     const stateElectra = state as CachedBeaconStateElectra;
     stateElectra.pendingPartialWithdrawals = stateElectra.pendingPartialWithdrawals.sliceFrom(
       processedPartialWithdrawalsCount
@@ -105,13 +105,13 @@ export function processWithdrawals(
     }
   }
   // Update the nextWithdrawalIndex
-  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/capella/beacon-chain.md#new-update_next_withdrawal_index
+  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/capella/beacon-chain.md#new-update_next_withdrawal_index
   const latestWithdrawal = expectedWithdrawals.at(-1);
   if (latestWithdrawal) {
     state.nextWithdrawalIndex = latestWithdrawal.index + 1;
   }
 
-  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/capella/beacon-chain.md#new-update_next_withdrawal_validator_index
+  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/capella/beacon-chain.md#new-update_next_withdrawal_validator_index
   // Update the nextWithdrawalValidatorIndex
   if (latestWithdrawal && expectedWithdrawals.length === MAX_WITHDRAWALS_PER_PAYLOAD) {
     // All slots filled, nextWithdrawalValidatorIndex should be validatorIndex having next turn
@@ -418,7 +418,7 @@ export function getExpectedWithdrawals(
 
   const expectedWithdrawals: capella.Withdrawal[] = [];
   // Separate maps to track balances after applying withdrawals
-  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.0/specs/capella/beacon-chain.md#new-get_balance_after_withdrawals
+  // https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/capella/beacon-chain.md#new-get_balance_after_withdrawals
   const builderBalanceAfterWithdrawals = new Map<BuilderIndex, number>();
   const validatorBalanceAfterWithdrawals = new Map<ValidatorIndex, number>();
   // partialWithdrawalsCount is withdrawals coming from EL since electra (EIP-7002)
