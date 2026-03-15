@@ -1057,6 +1057,14 @@ export class ForkChoice implements IForkChoice {
   }
 
   /**
+   * Check if an execution payload with the given block hash has been seen.
+   * Spec: gloas/p2p-interface.md — parent execution payload must have been seen
+   */
+  hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
+    return this.protoArray.hasExecutionPayload(executionPayloadBlockHash);
+  }
+
+  /**
    * Returns a MUTABLE `ProtoBlock` if the block is known **and** a descendant of the finalized root.
    */
   getBlockHex(blockRoot: RootHex, payloadStatus: PayloadStatus): ProtoBlock | null {

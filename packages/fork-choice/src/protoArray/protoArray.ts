@@ -1672,6 +1672,36 @@ export class ProtoArray {
   }
 
   /**
+   * Check if an execution payload with the given block hash has been seen.
+   * Looks through all nodes with FULL variant status for a matching executionPayloadBlockHash.
+   * Used for Gloas gossip validation: parent execution payload must have been seen.
+   *
+   * TODO GLOAS: Add secondary index (Set<RootHex> by executionPayloadBlockHash) for O(1) lookups.
+   * Current O(n) linear scan is acceptable during development but should be optimized before mainnet.
+   */
+  hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
+    for (const [, variantOrArr] of this.indices) {
+      if (!Array.isArray(variantOrArr)) {
+        // Pre-Gloas: check directly
+        const node = this.nodes[variantOrArr];
+        if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
+          return true;
+        }
+      } else {
+        // Gloas: check FULL variant if it exists
+        const fullIndex = variantOrArr[PayloadStatus.FULL];
+        if (fullIndex !== undefined) {
+          const node = this.nodes[fullIndex];
+          if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Return ProtoNode for blockRoot with explicit payload status
    *
    * @param blockRoot - The block root to look up

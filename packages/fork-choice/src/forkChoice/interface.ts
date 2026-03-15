@@ -228,6 +228,11 @@ export interface IForkChoice {
    */
   hasBlockUnsafe(blockRoot: Root): boolean;
   hasBlockHexUnsafe(blockRoot: RootHex): boolean;
+  /**
+   * Check if an execution payload with the given block hash has been seen.
+   * For Gloas: checks if any block has a FULL variant with matching execution payload block hash.
+   */
+  hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean;
   getSlotsPresent(windowStart: number): number;
   /**
    * Returns a `ProtoBlock` if the block is known **and** a descendant of the finalized root.
