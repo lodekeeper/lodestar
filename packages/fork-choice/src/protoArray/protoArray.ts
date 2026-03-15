@@ -21,6 +21,12 @@ import {
  */
 const PAYLOAD_TIMELY_THRESHOLD = Math.floor(PTC_SIZE / 2);
 
+/**
+ * Threshold for payload data availability (>50% of PTC must vote)
+ * Spec: gloas/fork-choice.md (DATA_AVAILABILITY_TIMELY_THRESHOLD = PTC_SIZE // 2)
+ */
+const DATA_AVAILABILITY_TIMELY_THRESHOLD = Math.floor(PTC_SIZE / 2);
+
 export const DEFAULT_PRUNE_THRESHOLD = 0;
 type ProposerBoost = {root: RootHex; score: number};
 
@@ -61,14 +67,24 @@ export class ProtoArray {
   private previousProposerBoost: ProposerBoost | null = null;
 
   /**
-   * PTC (Payload Timeliness Committee) votes per block as bitvectors
+   * Payload timeliness votes per block as bitvectors
    * Maps block root to BitArray of PTC_SIZE bits (512 mainnet, 2 minimal)
-   * Spec: gloas/fork-choice.md#modified-store (line 148)
+   * Spec: gloas/fork-choice.md#modified-store (payload_timeliness_vote)
    *
    * Bit i is set if PTC member i voted payload_present=true
    * Used by is_payload_timely() to determine if payload is timely
    */
-  private ptcVotes = new Map<RootHex, BitArray>();
+  private payloadTimelinessVotes = new Map<RootHex, BitArray>();
+
+  /**
+   * Payload data availability votes per block as bitvectors
+   * Maps block root to BitArray of PTC_SIZE bits (512 mainnet, 2 minimal)
+   * Spec: gloas/fork-choice.md#modified-store (payload_data_availability_vote)
+   *
+   * Bit i is set if PTC member i voted blob_data_available=true
+   * Used by is_payload_data_available() to determine if blob data is available
+   */
+  private payloadDataAvailabilityVotes = new Map<RootHex, BitArray>();
 
   constructor({
     pruneThreshold,
@@ -495,9 +511,20 @@ export class ProtoArray {
       // Update bestChild for PENDING → EMPTY edge
       this.maybeUpdateBestChildAndDescendant(pendingIndex, emptyIndex, currentSlot, proposerBoostRoot);
 
-      // Initialize PTC votes for this block (all false initially)
-      // Spec: gloas/fork-choice.md#modified-on_block (line 645)
-      this.ptcVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
+      // Initialize both vote maps for this block
+      // Spec: gloas/fork-choice.md#modified-on_block (all false for new blocks)
+      // Spec: gloas/fork-choice.md#modified-get_forkchoice_store (all true for anchor block)
+      const timelinessVotes = BitArray.fromBitLen(PTC_SIZE);
+      const dataAvailabilityVotes = BitArray.fromBitLen(PTC_SIZE);
+      if (block.blockRoot === this.finalizedRoot) {
+        // Anchor block: set all bits to true per get_forkchoice_store spec
+        for (let i = 0; i < PTC_SIZE; i++) {
+          timelinessVotes.set(i, true);
+          dataAvailabilityVotes.set(i, true);
+        }
+      }
+      this.payloadTimelinessVotes.set(block.blockRoot, timelinessVotes);
+      this.payloadDataAvailabilityVotes.set(block.blockRoot, dataAvailabilityVotes);
     } else {
       // Pre-Gloas: Only create FULL node (payload embedded in block)
       const node: ProtoNode = {
@@ -612,11 +639,18 @@ export class ProtoArray {
    *
    * @param blockRoot - The beacon block root being attested
    * @param ptcIndices - Array of PTC committee indices that voted (0..PTC_SIZE-1)
-   * @param payloadPresent - Whether the validators attest the payload is present
+   * @param payloadPresent - Whether the validators attest the payload is present (timeliness)
+   * @param blobDataAvailable - Whether the validators attest blob data is available
    */
-  notifyPtcMessages(blockRoot: RootHex, ptcIndices: number[], payloadPresent: boolean): void {
-    const votes = this.ptcVotes.get(blockRoot);
-    if (votes === undefined) {
+  notifyPtcMessages(
+    blockRoot: RootHex,
+    ptcIndices: number[],
+    payloadPresent: boolean,
+    blobDataAvailable: boolean
+  ): void {
+    const timelinessVotes = this.payloadTimelinessVotes.get(blockRoot);
+    const dataAvailabilityVotes = this.payloadDataAvailabilityVotes.get(blockRoot);
+    if (timelinessVotes === undefined || dataAvailabilityVotes === undefined) {
       // Block not found or not a Gloas block, ignore
       return;
     }
@@ -626,7 +660,8 @@ export class ProtoArray {
         throw new Error(`Invalid PTC index: ${ptcIndex}, must be 0..${PTC_SIZE - 1}`);
       }
 
-      votes.set(ptcIndex, payloadPresent);
+      timelinessVotes.set(ptcIndex, payloadPresent);
+      dataAvailabilityVotes.set(ptcIndex, blobDataAvailable);
     }
   }
 
@@ -642,7 +677,7 @@ export class ProtoArray {
    * @param blockRoot - The beacon block root to check
    */
   isPayloadTimely(blockRoot: RootHex): boolean {
-    const votes = this.ptcVotes.get(blockRoot);
+    const votes = this.payloadTimelinessVotes.get(blockRoot);
     if (votes === undefined) {
       // Block not found or not a Gloas block
       return false;
@@ -658,6 +693,35 @@ export class ProtoArray {
     // Count votes for payload_present=true
     const yesVotes = bitCount(votes.uint8Array);
     return yesVotes > PAYLOAD_TIMELY_THRESHOLD;
+  }
+
+  /**
+   * Check if blob data for a block is available
+   * Spec: gloas/fork-choice.md#new-is_payload_data_available
+   *
+   * Returns true if:
+   * 1. Block has data availability votes tracked
+   * 2. Payload is locally available (FULL variant exists in proto array)
+   * 3. More than DATA_AVAILABILITY_TIMELY_THRESHOLD (>50% of PTC) voted blob_data_available=true
+   *
+   * @param blockRoot - The beacon block root to check
+   */
+  isPayloadDataAvailable(blockRoot: RootHex): boolean {
+    const votes = this.payloadDataAvailabilityVotes.get(blockRoot);
+    if (votes === undefined) {
+      // Block not found or not a Gloas block
+      return false;
+    }
+
+    // If payload is not locally available, blob data is not considered available
+    const fullNodeIndex = this.getNodeIndexByRootAndStatus(blockRoot, PayloadStatus.FULL);
+    if (fullNodeIndex === undefined) {
+      return false;
+    }
+
+    // Count votes for blob_data_available=true
+    const yesVotes = bitCount(votes.uint8Array);
+    return yesVotes > DATA_AVAILABILITY_TIMELY_THRESHOLD;
   }
 
   /**
@@ -684,8 +748,8 @@ export class ProtoArray {
    * @param proposerBoostRoot - Current proposer boost root (from ForkChoice)
    */
   shouldExtendPayload(blockRoot: RootHex, proposerBoostRoot: RootHex | null): boolean {
-    // Condition 1: Payload is timely
-    if (this.isPayloadTimely(blockRoot)) {
+    // Condition 1: Payload is timely AND blob data is available
+    if (this.isPayloadTimely(blockRoot) && this.isPayloadDataAvailable(blockRoot)) {
       return true;
     }
 
@@ -1083,7 +1147,8 @@ export class ProtoArray {
       this.indices.delete(root);
       // Prune PTC votes for this block to prevent memory leak
       // Spec: gloas/fork-choice.md (implicit - finalized blocks don't need PTC votes)
-      this.ptcVotes.delete(root);
+      this.payloadTimelinessVotes.delete(root);
+      this.payloadDataAvailabilityVotes.delete(root);
     }
 
     // Store nodes prior to finalization

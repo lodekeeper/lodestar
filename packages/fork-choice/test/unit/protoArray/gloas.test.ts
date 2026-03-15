@@ -347,7 +347,7 @@ describe("Gloas Fork Choice", () => {
       expect(protoArray.isPayloadTimely("0x02")).toBe(false);
 
       // Vote yes from validators at indices 0, 1, 2
-      protoArray.notifyPtcMessages("0x02", [0, 1, 2], true);
+      protoArray.notifyPtcMessages("0x02", [0, 1, 2], true, true);
 
       // Still not timely (need >50% of PTC_SIZE)
       expect(protoArray.isPayloadTimely("0x02")).toBe(false);
@@ -357,15 +357,15 @@ describe("Gloas Fork Choice", () => {
       const block = createTestBlock(gloasForkSlot, "0x02", genesisRoot, genesisRoot);
       protoArray.onBlock(block, gloasForkSlot, null);
 
-      expect(() => protoArray.notifyPtcMessages("0x02", [-1], true)).toThrow(/Invalid PTC index/);
-      expect(() => protoArray.notifyPtcMessages("0x02", [PTC_SIZE], true)).toThrow(/Invalid PTC index/);
-      expect(() => protoArray.notifyPtcMessages("0x02", [PTC_SIZE + 1], true)).toThrow(/Invalid PTC index/);
-      expect(() => protoArray.notifyPtcMessages("0x02", [0, 1, PTC_SIZE], true)).toThrow(/Invalid PTC index/);
+      expect(() => protoArray.notifyPtcMessages("0x02", [-1], true, true)).toThrow(/Invalid PTC index/);
+      expect(() => protoArray.notifyPtcMessages("0x02", [PTC_SIZE], true, true)).toThrow(/Invalid PTC index/);
+      expect(() => protoArray.notifyPtcMessages("0x02", [PTC_SIZE + 1], true, true)).toThrow(/Invalid PTC index/);
+      expect(() => protoArray.notifyPtcMessages("0x02", [0, 1, PTC_SIZE], true, true)).toThrow(/Invalid PTC index/);
     });
 
     it("notifyPtcMessages() handles unknown block gracefully", () => {
       // Should not throw for unknown block
-      expect(() => protoArray.notifyPtcMessages("0x99", [0], true)).not.toThrow();
+      expect(() => protoArray.notifyPtcMessages("0x99", [0], true, true)).not.toThrow();
     });
 
     it("isPayloadTimely() returns false when payload not locally available", () => {
@@ -433,7 +433,7 @@ describe("Gloas Fork Choice", () => {
       expect(protoArray.isPayloadTimely("0x02")).toBe(true);
 
       // Change some yes votes to no
-      protoArray.notifyPtcMessages("0x02", [0, 1], false);
+      protoArray.notifyPtcMessages("0x02", [0, 1], false, false);
 
       // Should no longer be timely
       expect(protoArray.isPayloadTimely("0x02")).toBe(false);
@@ -451,7 +451,7 @@ describe("Gloas Fork Choice", () => {
       expect(protoArray.isPayloadTimely("0x02")).toBe(false);
 
       // notifyPtcMessages should be no-op
-      expect(() => protoArray.notifyPtcMessages("0x02", [0], true)).not.toThrow();
+      expect(() => protoArray.notifyPtcMessages("0x02", [0], true, true)).not.toThrow();
     });
   });
 
