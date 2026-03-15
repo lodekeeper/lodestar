@@ -70,6 +70,13 @@ export class ProtoArray {
    */
   private ptcVotes = new Map<RootHex, BitArray>();
 
+  /**
+   * Secondary index: O(1) lookup by execution payload block hash.
+   * Maintained by onBlock() (pre-Gloas) and onExecutionPayload() (Gloas).
+   * Pruned in maybePrune().
+   */
+  private executionPayloadBlockHashes = new Set<RootHex>();
+
   constructor({
     pruneThreshold,
     justifiedEpoch,
@@ -515,6 +522,11 @@ export class ProtoArray {
       // Pre-Gloas: store FULL index instead of array
       this.indices.set(block.blockRoot, nodeIndex);
 
+      // Maintain secondary index for O(1) hasExecutionPayload lookups
+      if (block.executionPayloadBlockHash != null) {
+        this.executionPayloadBlockHashes.add(block.executionPayloadBlockHash);
+      }
+
       // If this node is valid, lets propagate the valid status up the chain
       // and throw error if we counter invalid, as this breaks consensus
       if (node.parent !== undefined) {
@@ -601,6 +613,9 @@ export class ProtoArray {
 
     // Add FULL variant to the indices array
     variants[PayloadStatus.FULL] = fullIndex;
+
+    // Maintain secondary index for O(1) hasExecutionPayload lookups
+    this.executionPayloadBlockHashes.add(executionPayloadBlockHash);
 
     // Update bestChild for PENDING node (may now prefer FULL over EMPTY)
     this.maybeUpdateBestChildAndDescendant(pendingIndex, fullIndex, currentSlot, proposerBoostRoot);
@@ -1078,6 +1093,13 @@ export class ProtoArray {
       prunedRoots.add(node.blockRoot);
     }
 
+    // Clean up secondary execution payload block hash index
+    for (let i = 0; i < finalizedIndex; i++) {
+      const node = this.nodes[i];
+      if (node?.executionPayloadBlockHash != null) {
+        this.executionPayloadBlockHashes.delete(node.executionPayloadBlockHash);
+      }
+    }
     // Remove indices for pruned blocks and PTC votes
     for (const root of prunedRoots) {
       this.indices.delete(root);
@@ -1673,32 +1695,12 @@ export class ProtoArray {
 
   /**
    * Check if an execution payload with the given block hash has been seen.
-   * Looks through all nodes with FULL variant status for a matching executionPayloadBlockHash.
    * Used for Gloas gossip validation: parent execution payload must have been seen.
    *
-   * TODO GLOAS: Add secondary index (Set<RootHex> by executionPayloadBlockHash) for O(1) lookups.
-   * Current O(n) linear scan is acceptable during development but should be optimized before mainnet.
+   * O(1) via secondary index maintained in onBlock() (pre-Gloas) and onExecutionPayload() (Gloas).
    */
   hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
-    for (const [, variantOrArr] of this.indices) {
-      if (!Array.isArray(variantOrArr)) {
-        // Pre-Gloas: check directly
-        const node = this.nodes[variantOrArr];
-        if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
-          return true;
-        }
-      } else {
-        // Gloas: check FULL variant if it exists
-        const fullIndex = variantOrArr[PayloadStatus.FULL];
-        if (fullIndex !== undefined) {
-          const node = this.nodes[fullIndex];
-          if (node?.executionPayloadBlockHash === executionPayloadBlockHash) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
+    return this.executionPayloadBlockHashes.has(executionPayloadBlockHash);
   }
 
   /**
