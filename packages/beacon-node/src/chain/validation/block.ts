@@ -156,7 +156,6 @@ export async function validateGossipBlock(
     // [IGNORE] The block's parent execution payload (defined by bid.parent_block_hash) has been seen
     // (via gossip or non-gossip sources) (a client MAY queue blocks for processing once the parent
     // payload is retrieved).
-    // Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/p2p-interface.md
     const parentBlockHashHex = toRootHex(bid.parentBlockHash);
     if (!chain.forkChoice.hasExecutionPayload(parentBlockHashHex)) {
       throw new BlockGossipError(GossipAction.IGNORE, {

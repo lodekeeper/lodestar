@@ -47,13 +47,11 @@ exceptions:
     - PAYLOAD_STATUS_FULL#gloas
     - PAYLOAD_STATUS_PENDING#gloas
     - PTC_TIMELINESS_INDEX#gloas
-    # heze (not yet implemented in this branch)
     - DOMAIN_INCLUSION_LIST_COMMITTEE#heze
 
   containers:
     # gloas
     - ForkChoiceNode#gloas
-    # heze (not yet implemented in this branch)
     - BeaconState#heze
     - ExecutionPayloadBid#heze
     - InclusionList#heze
@@ -77,7 +75,6 @@ exceptions:
     - ExpectedWithdrawals#gloas
     - LatestMessage#gloas
     - Store#gloas
-    # heze (not yet implemented in this branch)
     - GetInclusionListResponse#heze
     - InclusionListStore#heze
     - PayloadAttributes#heze
@@ -317,7 +314,6 @@ exceptions:
     - validate_merge_block#gloas
     - validate_on_attestation#gloas
     - verify_data_column_sidecar#gloas
-    # heze (not yet implemented in this branch)
     - compute_fork_version#heze
     - get_forkchoice_store#heze
     - get_inclusion_list_bits#heze
@@ -358,7 +354,6 @@ exceptions:
     - PayloadStatus#gloas
 
   configs:
-    # heze (not yet implemented in this branch)
     - HEZE_FORK_EPOCH#heze
     - HEZE_FORK_VERSION#heze
     - INCLUSION_LIST_SUBMISSION_DUE_BPS#heze
@@ -368,5 +363,4 @@ exceptions:
     - VIEW_FREEZE_CUTOFF_BPS#heze
 
   presets:
-    # heze (not yet implemented in this branch)
     - INCLUSION_LIST_COMMITTEE_SIZE#heze
