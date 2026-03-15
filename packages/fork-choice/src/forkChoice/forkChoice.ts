@@ -1673,6 +1673,22 @@ export class ForkChoice implements IForkChoice {
       });
     }
 
+    // [New in Gloas:EIP7732]
+    // If attesting for a full node (index=1), the payload must be known (locally available)
+    // Spec: gloas/fork-choice.md#modified-validate_on_attestation
+    if (isGloasBlock(block) && attestationData.index === 1) {
+      const fullVariant = this.protoArray.getNodeIndexByRootAndStatus(beaconBlockRootHex, PayloadStatus.FULL);
+      if (fullVariant === undefined) {
+        throw new ForkChoiceError({
+          code: ForkChoiceErrorCode.INVALID_ATTESTATION,
+          err: {
+            code: InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS,
+            beaconBlockRoot: beaconBlockRootHex,
+          },
+        });
+      }
+    }
+
     this.validatedAttestationDatas.add(attDataRoot);
   }
 
