@@ -512,10 +512,20 @@ export class ProtoArray {
       // Update bestChild for PENDING → EMPTY edge
       this.maybeUpdateBestChildAndDescendant(pendingIndex, emptyIndex, currentSlot, proposerBoostRoot);
 
-      // Initialize both vote maps for this block (all false initially)
-      // Spec: gloas/fork-choice.md#modified-on_block
-      this.payloadTimelinessVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
-      this.payloadDataAvailabilityVotes.set(block.blockRoot, BitArray.fromBitLen(PTC_SIZE));
+      // Initialize both vote maps for this block
+      // Spec: gloas/fork-choice.md#modified-on_block (all false for new blocks)
+      // Spec: gloas/fork-choice.md#modified-get_forkchoice_store (all true for anchor block)
+      const timelinessVotes = BitArray.fromBitLen(PTC_SIZE);
+      const dataAvailabilityVotes = BitArray.fromBitLen(PTC_SIZE);
+      if (block.blockRoot === this.finalizedRoot) {
+        // Anchor block: set all bits to true per get_forkchoice_store spec
+        for (let i = 0; i < PTC_SIZE; i++) {
+          timelinessVotes.set(i, true);
+          dataAvailabilityVotes.set(i, true);
+        }
+      }
+      this.payloadTimelinessVotes.set(block.blockRoot, timelinessVotes);
+      this.payloadDataAvailabilityVotes.set(block.blockRoot, dataAvailabilityVotes);
     } else {
       // Pre-Gloas: Only create FULL node (payload embedded in block)
       const node: ProtoNode = {
@@ -1453,7 +1463,7 @@ export class ProtoArray {
    * Gloas: Returns (root, payloadStatus) based on actual node state
    */
   getAncestor(blockRoot: RootHex, ancestorSlot: Slot): ProtoNode {
-    // Get any variant to check the block (use variants[0])
+    // Get any variant to check the block (EMPTY for Gloas, FULL for pre-Gloas)
     const variantOrArr = this.indices.get(blockRoot);
     if (variantOrArr == null) {
       throw new ForkChoiceError({
@@ -1482,7 +1492,7 @@ export class ProtoArray {
       });
     }
 
-    let parentIndex = Array.isArray(parentVariants) ? parentVariants[0] : parentVariants;
+    let parentIndex = Array.isArray(parentVariants) ? parentVariants[PayloadStatus.EMPTY] : parentVariants;
     let parentBlock = this.nodes[parentIndex];
 
     // Walk backwards while parent.slot > ancestorSlot
@@ -1498,7 +1508,7 @@ export class ProtoArray {
         });
       }
 
-      parentIndex = Array.isArray(nextParentVariants) ? nextParentVariants[0] : nextParentVariants;
+      parentIndex = Array.isArray(nextParentVariants) ? nextParentVariants[PayloadStatus.EMPTY] : nextParentVariants;
       parentBlock = this.nodes[parentIndex];
     }
 
@@ -1729,6 +1739,9 @@ export class ProtoArray {
    * Check if an execution payload with the given block hash has been seen.
    * Looks through all nodes with FULL variant status for a matching executionPayloadBlockHash.
    * Used for Gloas gossip validation: parent execution payload must have been seen.
+   *
+   * TODO GLOAS: Add secondary index (Set<RootHex> by executionPayloadBlockHash) for O(1) lookups.
+   * Current O(n) linear scan is acceptable during development but should be optimized before mainnet.
    */
   hasExecutionPayload(executionPayloadBlockHash: RootHex): boolean {
     for (const [, variantOrArr] of this.indices) {

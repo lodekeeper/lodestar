@@ -24,6 +24,7 @@ import {RootCache} from "./rootCache.js";
  *
  * Note: This function naively revalidates deposit signatures on every call.
  * Implementations SHOULD cache verification results to avoid repeated work.
+ * TODO GLOAS: Cache deposit signature validation results to avoid repeated BLS verification
  */
 export function isPendingValidator(config: BeaconConfig, state: CachedBeaconStateGloas, pubkey: BLSPubkey): boolean {
   for (let i = 0; i < state.pendingDeposits.length; i++) {
