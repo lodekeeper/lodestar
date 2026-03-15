@@ -1,3 +1,4 @@
+import {BeaconConfig} from "@lodestar/config";
 import {
   BUILDER_INDEX_FLAG,
   BUILDER_PAYMENT_THRESHOLD_DENOMINATOR,
@@ -8,13 +9,43 @@ import {
   MIN_DEPOSIT_AMOUNT,
   SLOTS_PER_EPOCH,
 } from "@lodestar/params";
-import {BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
+import {BLSPubkey, BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
 import {AttestationData} from "@lodestar/types/phase0";
 import {byteArrayEquals} from "@lodestar/utils";
+import {isValidDepositSignature} from "../block/processDeposit.js";
 import {CachedBeaconStateGloas} from "../types.js";
 import {getBlockRootAtSlot} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
 import {RootCache} from "./rootCache.js";
+
+/**
+ * Check if a pending deposit with a valid signature is in the queue for the given pubkey.
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.3/specs/gloas/beacon-chain.md#new-is_pending_validator
+ *
+ * Note: This function naively revalidates deposit signatures on every call.
+ * Implementations SHOULD cache verification results to avoid repeated work.
+ * TODO GLOAS: Cache deposit signature validation results to avoid repeated BLS verification
+ */
+export function isPendingValidator(config: BeaconConfig, state: CachedBeaconStateGloas, pubkey: BLSPubkey): boolean {
+  for (let i = 0; i < state.pendingDeposits.length; i++) {
+    const pendingDeposit = state.pendingDeposits.getReadonly(i);
+    if (!byteArrayEquals(pendingDeposit.pubkey, pubkey)) {
+      continue;
+    }
+    if (
+      isValidDepositSignature(
+        config,
+        pendingDeposit.pubkey,
+        pendingDeposit.withdrawalCredentials,
+        pendingDeposit.amount,
+        pendingDeposit.signature
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
