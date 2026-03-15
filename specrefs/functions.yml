@@ -441,7 +441,9 @@
     </spec>
 
 - name: compute_attestation_subnet_prefix_bits#phase0
-  sources: []
+  sources:
+    - file: packages/params/src/index.ts
+      search: "export const ATTESTATION_SUBNET_PREFIX_BITS ="
   spec: |
     <spec fn="compute_attestation_subnet_prefix_bits" fork="phase0" hash="5adb201b">
     def compute_attestation_subnet_prefix_bits() -> uint64:
@@ -912,7 +914,9 @@
     </spec>
 
 - name: compute_max_request_blob_sidecars#deneb
-  sources: []
+  sources:
+    - file: packages/config/src/chainConfig/configs/mainnet.ts
+      search: "MAX_REQUEST_BLOB_SIDECARS:"
   spec: |
     <spec fn="compute_max_request_blob_sidecars" fork="deneb" hash="c05cd1d6">
     def compute_max_request_blob_sidecars() -> uint64:
@@ -923,7 +927,9 @@
     </spec>
 
 - name: compute_max_request_blob_sidecars#electra
-  sources: []
+  sources:
+    - file: packages/config/src/chainConfig/configs/mainnet.ts
+      search: "MAX_REQUEST_BLOB_SIDECARS_ELECTRA:"
   spec: |
     <spec fn="compute_max_request_blob_sidecars" fork="electra" hash="38243cb4">
     def compute_max_request_blob_sidecars() -> uint64:
@@ -935,7 +941,9 @@
     </spec>
 
 - name: compute_max_request_data_column_sidecars#fulu
-  sources: []
+  sources:
+    - file: packages/config/src/chainConfig/configs/mainnet.ts
+      search: "MAX_REQUEST_DATA_COLUMN_SIDECARS:"
   spec: |
     <spec fn="compute_max_request_data_column_sidecars" fork="fulu" hash="5f2f149d">
     def compute_max_request_data_column_sidecars() -> uint64:
@@ -946,7 +954,9 @@
     </spec>
 
 - name: compute_min_epochs_for_block_requests#phase0
-  sources: []
+  sources:
+    - file: packages/config/src/chainConfig/configs/mainnet.ts
+      search: "MIN_EPOCHS_FOR_BLOCK_REQUESTS:"
   spec: |
     <spec fn="compute_min_epochs_for_block_requests" fork="phase0" hash="90b21de3">
     def compute_min_epochs_for_block_requests() -> uint64:
@@ -5844,7 +5854,9 @@
     </spec>
 
 - name: is_payload_data_available#gloas
-  sources: []
+  sources:
+    - file: packages/fork-choice/src/protoArray/protoArray.ts
+      search: "isPayloadDataAvailable(blockRoot: RootHex)"
   spec: |
     <spec fn="is_payload_data_available" fork="gloas" hash="2b145d4d">
     def is_payload_data_available(store: Store, root: Root) -> bool:
@@ -5904,7 +5916,9 @@
     </spec>
 
 - name: is_pending_validator#gloas
-  sources: []
+  sources:
+    - file: packages/state-transition/src/util/gloas.ts
+      search: "export function isPendingValidator("
   spec: |
     <spec fn="is_pending_validator" fork="gloas" hash="9b409bab">
     def is_pending_validator(state: BeaconState, pubkey: BLSPubkey) -> bool:
