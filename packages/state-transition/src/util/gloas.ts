@@ -205,18 +205,10 @@ export function getPayloadTimelinessCommittee(state: CachedBeaconStateGloas, slo
 
   // Previous epoch fallback at epoch boundary (slot + 1 === state.slot)
   if (slot + 1 === state.slot) {
-    const ptc = new Uint32Array(state.previousPtc.length);
-    for (let i = 0; i < ptc.length; i++) {
-      ptc[i] = state.previousPtc.get(i);
-    }
-    return ptc;
+    return Uint32Array.from(state.previousPtc.getAll());
   }
 
   throw new Error(`Payload Timeliness Committee is not available for slot=${slot}, state.slot=${state.slot}`);
-}
-
-export function getPtcCommitteeIndex(ptc: Uint32Array, validatorIndex: ValidatorIndex): number {
-  return ptc.indexOf(validatorIndex);
 }
 
 export function getIndexedPayloadAttestation(
@@ -224,13 +216,7 @@ export function getIndexedPayloadAttestation(
   payloadAttestation: gloas.PayloadAttestation
 ): gloas.IndexedPayloadAttestation {
   const ptc = getPayloadTimelinessCommittee(state, payloadAttestation.data.slot);
-  const attestingIndices: number[] = [];
-
-  for (let i = 0; i < ptc.length; i++) {
-    if (payloadAttestation.aggregationBits.get(i)) {
-      attestingIndices.push(ptc[i]);
-    }
-  }
+  const attestingIndices = payloadAttestation.aggregationBits.intersectValues(ptc);
 
   return {
     attestingIndices: attestingIndices.sort((a, b) => a - b),

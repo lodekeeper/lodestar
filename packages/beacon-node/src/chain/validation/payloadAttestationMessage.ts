@@ -19,20 +19,21 @@ export async function validateApiPayloadAttestationMessage(
   chain: IBeaconChain,
   payloadAttestationMessage: gloas.PayloadAttestationMessage
 ): Promise<PayloadAttestationValidationResult> {
-  return validatePayloadAttestationMessage(chain, payloadAttestationMessage, true);
+  const prioritizeBls = true;
+  return validatePayloadAttestationMessage(chain, payloadAttestationMessage, prioritizeBls);
 }
 
 export async function validateGossipPayloadAttestationMessage(
   chain: IBeaconChain,
   payloadAttestationMessage: gloas.PayloadAttestationMessage
 ): Promise<PayloadAttestationValidationResult> {
-  return validatePayloadAttestationMessage(chain, payloadAttestationMessage, false);
+  return validatePayloadAttestationMessage(chain, payloadAttestationMessage);
 }
 
 async function validatePayloadAttestationMessage(
   chain: IBeaconChain,
   payloadAttestationMessage: gloas.PayloadAttestationMessage,
-  prioritizeBls: boolean
+  prioritizeBls = false
 ): Promise<PayloadAttestationValidationResult> {
   const {data, validatorIndex} = payloadAttestationMessage;
   const epoch = computeEpochAtSlot(data.slot);
