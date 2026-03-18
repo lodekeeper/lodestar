@@ -289,6 +289,8 @@ function processSlotsWithTransientCache(
         timer?.();
       }
 
+      // payloadTimelinessCommittees for the new epoch are computed in finalProcessEpoch above,
+      // rotate cached PTCs in the state to reflect the new slot
       if (fork >= ForkSeq.gloas) {
         rotatePayloadTimelinessCommittees(postState as CachedBeaconStateGloas);
       }
@@ -305,6 +307,8 @@ function processSlotsWithTransientCache(
       epochTransitionTimer?.();
     } else {
       postState.slot++;
+      // payloadTimelinessCommittees are available from epochCtx (computed at epoch transition),
+      // rotate cached PTCs in the state for the new slot
       if (fork >= ForkSeq.gloas) {
         rotatePayloadTimelinessCommittees(postState as CachedBeaconStateGloas);
       }

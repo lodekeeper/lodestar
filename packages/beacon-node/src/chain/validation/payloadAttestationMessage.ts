@@ -3,8 +3,6 @@ import {
   computeEpochAtSlot,
   createSingleSignatureSetFromComponents,
   getPayloadAttestationDataSigningRoot,
-  getPayloadTimelinessCommittee,
-  getPtcCommitteeIndex,
 } from "@lodestar/state-transition";
 import {RootHex, gloas, ssz} from "@lodestar/types";
 import {toRootHex} from "@lodestar/utils";
@@ -21,19 +19,20 @@ export async function validateApiPayloadAttestationMessage(
   chain: IBeaconChain,
   payloadAttestationMessage: gloas.PayloadAttestationMessage
 ): Promise<PayloadAttestationValidationResult> {
-  return validatePayloadAttestationMessage(chain, payloadAttestationMessage);
+  return validatePayloadAttestationMessage(chain, payloadAttestationMessage, true);
 }
 
 export async function validateGossipPayloadAttestationMessage(
   chain: IBeaconChain,
   payloadAttestationMessage: gloas.PayloadAttestationMessage
 ): Promise<PayloadAttestationValidationResult> {
-  return validatePayloadAttestationMessage(chain, payloadAttestationMessage);
+  return validatePayloadAttestationMessage(chain, payloadAttestationMessage, false);
 }
 
 async function validatePayloadAttestationMessage(
   chain: IBeaconChain,
-  payloadAttestationMessage: gloas.PayloadAttestationMessage
+  payloadAttestationMessage: gloas.PayloadAttestationMessage,
+  prioritizeBls: boolean
 ): Promise<PayloadAttestationValidationResult> {
   const {data, validatorIndex} = payloadAttestationMessage;
   const epoch = computeEpochAtSlot(data.slot);
@@ -69,8 +68,8 @@ async function validatePayloadAttestationMessage(
     });
   }
 
-  const state = (await chain.getHeadStateAtSlot(
-    data.slot,
+  const state = (await chain.getHeadStateAtEpoch(
+    epoch,
     RegenCaller.validateGossipPayloadAttestation
   )) as CachedBeaconStateGloas;
 
@@ -81,8 +80,8 @@ async function validatePayloadAttestationMessage(
   // [REJECT] The message's validator index is within the payload committee in
   // `get_ptc(state, data.slot)`. The `state` is the head state corresponding to
   // processing the block up to the current slot as determined by the fork choice.
-  const ptc = getPayloadTimelinessCommittee(state, data.slot);
-  const validatorCommitteeIndex = getPtcCommitteeIndex(ptc, validatorIndex);
+  const ptc = state.epochCtx.getPayloadTimelinessCommittee(data.slot);
+  const validatorCommitteeIndex = ptc.indexOf(validatorIndex);
 
   if (validatorCommitteeIndex === -1) {
     throw new PayloadAttestationError(GossipAction.REJECT, {
@@ -106,7 +105,7 @@ async function validatePayloadAttestationMessage(
     payloadAttestationMessage.signature
   );
 
-  if (!(await chain.bls.verifySignatureSets([signatureSet]))) {
+  if (!(await chain.bls.verifySignatureSets([signatureSet], {batchable: true, priority: prioritizeBls}))) {
     throw new PayloadAttestationError(GossipAction.REJECT, {
       code: PayloadAttestationErrorCode.INVALID_SIGNATURE,
     });

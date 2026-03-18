@@ -17,11 +17,6 @@ import {computeEpochAtSlot} from "./epoch.js";
 import {RootCache} from "./rootCache.js";
 import {computePayloadTimelinessCommitteeAtSlot} from "./seed.js";
 
-export type PtcCommitteeView = {
-  readonly length: number;
-  get(index: number): ValidatorIndex;
-};
-
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
 }
@@ -200,28 +195,28 @@ export function rotatePayloadTimelinessCommittees(state: CachedBeaconStateGloas)
   );
 }
 
-export function getPayloadTimelinessCommittee(state: CachedBeaconStateGloas, slot: Slot): PtcCommitteeView {
-  if (slot === state.slot) {
-    return state.currentPtc;
+export function getPayloadTimelinessCommittee(state: CachedBeaconStateGloas, slot: Slot): Uint32Array {
+  const epoch = computeEpochAtSlot(slot);
+
+  // Fast path: use epochCtx cache (avoids state tree traversal)
+  if (epoch === state.epochCtx.epoch) {
+    return state.epochCtx.getPayloadTimelinessCommittee(slot);
   }
 
+  // Previous epoch fallback at epoch boundary (slot + 1 === state.slot)
   if (slot + 1 === state.slot) {
-    return state.previousPtc;
+    const ptc = new Uint32Array(state.previousPtc.length);
+    for (let i = 0; i < ptc.length; i++) {
+      ptc[i] = state.previousPtc.get(i);
+    }
+    return ptc;
   }
 
-  throw new Error(
-    `Payload Timeliness Committee is only available for current or previous slot, state.slot=${state.slot}, slot=${slot}`
-  );
+  throw new Error(`Payload Timeliness Committee is not available for slot=${slot}, state.slot=${state.slot}`);
 }
 
-export function getPtcCommitteeIndex(ptc: PtcCommitteeView, validatorIndex: ValidatorIndex): number {
-  for (let i = 0; i < ptc.length; i++) {
-    if (ptc.get(i) === validatorIndex) {
-      return i;
-    }
-  }
-
-  return -1;
+export function getPtcCommitteeIndex(ptc: Uint32Array, validatorIndex: ValidatorIndex): number {
+  return ptc.indexOf(validatorIndex);
 }
 
 export function getIndexedPayloadAttestation(
@@ -233,7 +228,7 @@ export function getIndexedPayloadAttestation(
 
   for (let i = 0; i < ptc.length; i++) {
     if (payloadAttestation.aggregationBits.get(i)) {
-      attestingIndices.push(ptc.get(i));
+      attestingIndices.push(ptc[i]);
     }
   }
 
