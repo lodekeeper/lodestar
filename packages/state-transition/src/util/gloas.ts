@@ -195,15 +195,11 @@ export function rotatePayloadTimelinessCommittees(state: CachedBeaconStateGloas)
   );
 }
 
-export function getPayloadTimelinessCommittee(state: CachedBeaconStateGloas, slot: Slot): Uint32Array {
-  return state.epochCtx.getPayloadTimelinessCommittee(slot);
-}
-
 export function getIndexedPayloadAttestation(
   state: CachedBeaconStateGloas,
   payloadAttestation: gloas.PayloadAttestation
 ): gloas.IndexedPayloadAttestation {
-  const ptc = getPayloadTimelinessCommittee(state, payloadAttestation.data.slot);
+  const ptc = state.epochCtx.getPayloadTimelinessCommittee(payloadAttestation.data.slot);
   const attestingIndices = payloadAttestation.aggregationBits.intersectValues(ptc);
 
   return {
