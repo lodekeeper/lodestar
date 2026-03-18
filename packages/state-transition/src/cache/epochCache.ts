@@ -226,9 +226,8 @@ export class EpochCache {
   /** TODO: Indexed SyncCommitteeCache */
   nextSyncCommitteeIndexed: SyncCommitteeCache;
 
-  // TODO GLOAS: See if we need to cache PTC for next epoch
-  // PTC for previous epoch, required for slot N block validating slot N-1 attestations
-  previousPayloadTimelinessCommittees: Uint32Array[];
+  // PTC for last slot of previous epoch, needed at epoch boundary for payload attestation processing
+  previousEpochLastSlotPtc: Uint32Array;
   // PTC for current epoch, computed eagerly at epoch transition
   payloadTimelinessCommittees: Uint32Array[];
 
@@ -268,7 +267,7 @@ export class EpochCache {
     previousTargetUnslashedBalanceIncrements: number;
     currentSyncCommitteeIndexed: SyncCommitteeCache;
     nextSyncCommitteeIndexed: SyncCommitteeCache;
-    previousPayloadTimelinessCommittees: Uint32Array[];
+    previousEpochLastSlotPtc: Uint32Array;
     payloadTimelinessCommittees: Uint32Array[];
     epoch: Epoch;
     syncPeriod: SyncPeriod;
@@ -299,7 +298,7 @@ export class EpochCache {
     this.previousTargetUnslashedBalanceIncrements = data.previousTargetUnslashedBalanceIncrements;
     this.currentSyncCommitteeIndexed = data.currentSyncCommitteeIndexed;
     this.nextSyncCommitteeIndexed = data.nextSyncCommitteeIndexed;
-    this.previousPayloadTimelinessCommittees = data.previousPayloadTimelinessCommittees;
+    this.previousEpochLastSlotPtc = data.previousEpochLastSlotPtc;
     this.payloadTimelinessCommittees = data.payloadTimelinessCommittees;
     this.epoch = data.epoch;
     this.syncPeriod = data.syncPeriod;
@@ -452,7 +451,7 @@ export class EpochCache {
     }
 
     // Compute PTC for all slots in the prev/current epoch
-    let previousPayloadTimelinessCommittees: Uint32Array[] = [];
+    const previousEpochLastSlotPtc = new Uint32Array(0);
     let payloadTimelinessCommittees: Uint32Array[] = [];
     if (currentEpoch >= config.GLOAS_FORK_EPOCH) {
       payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
@@ -461,15 +460,6 @@ export class EpochCache {
         currentShuffling.committees,
         effectiveBalanceIncrements
       );
-
-      if (!isGenesis && previousEpoch >= config.GLOAS_FORK_EPOCH) {
-        previousPayloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-          state,
-          previousEpoch,
-          previousShuffling.committees,
-          effectiveBalanceIncrements
-        );
-      }
     }
 
     // Precompute churnLimit for efficient initiateValidatorExit() during block proposing MUST be recompute everytime the
@@ -544,7 +534,7 @@ export class EpochCache {
       currentTargetUnslashedBalanceIncrements,
       currentSyncCommitteeIndexed,
       nextSyncCommitteeIndexed,
-      previousPayloadTimelinessCommittees,
+      previousEpochLastSlotPtc,
       payloadTimelinessCommittees,
       epoch: currentEpoch,
       syncPeriod: computeSyncPeriodAtEpoch(currentEpoch),
@@ -590,7 +580,7 @@ export class EpochCache {
       currentTargetUnslashedBalanceIncrements: this.currentTargetUnslashedBalanceIncrements,
       currentSyncCommitteeIndexed: this.currentSyncCommitteeIndexed,
       nextSyncCommitteeIndexed: this.nextSyncCommitteeIndexed,
-      previousPayloadTimelinessCommittees: this.previousPayloadTimelinessCommittees,
+      previousEpochLastSlotPtc: this.previousEpochLastSlotPtc,
       payloadTimelinessCommittees: this.payloadTimelinessCommittees,
       epoch: this.epoch,
       syncPeriod: this.syncPeriod,
@@ -702,8 +692,8 @@ export class EpochCache {
 
     this.proposersPrevEpoch = this.proposers;
     if (upcomingEpoch >= this.config.GLOAS_FORK_EPOCH) {
-      // Shift and compute current epoch PTC eagerly for all slots
-      this.previousPayloadTimelinessCommittees = this.payloadTimelinessCommittees;
+      // Save last slot PTC of outgoing epoch for epoch-boundary payload attestation processing
+      this.previousEpochLastSlotPtc = this.payloadTimelinessCommittees[SLOTS_PER_EPOCH - 1];
       this.payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
         state,
         upcomingEpoch,
@@ -1038,8 +1028,13 @@ export class EpochCache {
       return this.payloadTimelinessCommittees[slot % SLOTS_PER_EPOCH];
     }
 
-    if (epoch === this.epoch - 1 && this.previousPayloadTimelinessCommittees.length > 0) {
-      return this.previousPayloadTimelinessCommittees[slot % SLOTS_PER_EPOCH];
+    // Previous epoch: only the last slot is cached (for epoch-boundary payload attestation processing)
+    if (
+      epoch === this.epoch - 1 &&
+      slot % SLOTS_PER_EPOCH === SLOTS_PER_EPOCH - 1 &&
+      this.previousEpochLastSlotPtc.length > 0
+    ) {
+      return this.previousEpochLastSlotPtc;
     }
 
     throw new Error(`Payload Timeliness Committee is not available for slot=${slot}`);

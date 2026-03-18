@@ -1,4 +1,4 @@
-import {SLOTS_PER_HISTORICAL_ROOT} from "@lodestar/params";
+import {PTC_SIZE, SLOTS_PER_HISTORICAL_ROOT} from "@lodestar/params";
 import {ssz} from "@lodestar/types";
 import {toHex} from "@lodestar/utils";
 import {isValidDepositSignature} from "../block/processDeposit.js";
@@ -68,6 +68,9 @@ export function upgradeStateToGloas(stateFulu: CachedBeaconStateFulu): CachedBea
   stateGloasView.latestBlockHash = stateFulu.latestExecutionPayloadHeader.blockHash;
 
   const stateGloas = getCachedBeaconState(stateGloasView, stateFulu);
+
+  // Initialize previousPtc to zeros (no previous epoch PTC at fork boundary)
+  stateGloas.previousPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(new Array(PTC_SIZE).fill(0));
 
   // Process pending builder deposits at the fork boundary
   onboardBuildersFromPendingDeposits(stateGloas);

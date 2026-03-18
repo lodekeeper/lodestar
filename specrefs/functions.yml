@@ -2436,6 +2436,21 @@
         return None
     </spec>
 
+- name: process_ptc_update#gloas
+  sources:
+    - file: packages/state-transition/src/util/gloas.ts
+      search: '^export function processPtcUpdate\('
+      regex: true
+  spec: |
+    <spec fn="process_ptc_update" fork="gloas" hash="minimal-ptc-caching">
+    def process_ptc_update(state: BeaconState) -> None:
+        """
+        Cache the PTC for the current slot (last slot of the ending epoch)
+        before effective balance updates alter the weighted selection.
+        """
+        state.previous_ptc = compute_ptc(state, Slot(state.slot))
+    </spec>
+
 - name: get_committee_count_per_slot#phase0
   sources:
     - file: packages/state-transition/src/util/epochShuffling.ts
@@ -4052,21 +4067,21 @@
         return compute_proposer_score(justified_checkpoint_state)
     </spec>
 
-- name: get_ptc#gloas
+- name: compute_ptc#gloas
   sources:
-    - file: packages/state-transition/src/cache/epochCache.ts
-      search: '^\s+getPayloadTimelinessCommittee\('
+    - file: packages/state-transition/src/util/seed.ts
+      search: '^export function computePayloadTimelinessCommitteeAtSlot\('
       regex: true
   spec: |
-    <spec fn="get_ptc" fork="gloas" hash="ae15f761">
-    def get_ptc(state: BeaconState, slot: Slot) -> Vector[ValidatorIndex, PTC_SIZE]:
+    <spec fn="compute_ptc" fork="gloas" hash="minimal-ptc-caching">
+    def compute_ptc(state: BeaconState, slot: Slot) -> Vector[ValidatorIndex, PTC_SIZE]:
         """
-        Get the payload timeliness committee for the given ``slot``.
+        Compute the payload timeliness committee for the given ``slot``
+        using the state's current effective balances.
         """
         epoch = compute_epoch_at_slot(slot)
         seed = hash(get_seed(state, epoch, DOMAIN_PTC_ATTESTER) + uint_to_bytes(slot))
         indices: List[ValidatorIndex] = []
-        # Concatenate all committees for this slot in order
         committees_per_slot = get_committee_count_per_slot(state, epoch)
         for i in range(committees_per_slot):
             committee = get_beacon_committee(state, slot, CommitteeIndex(i))
@@ -4074,6 +4089,26 @@
         return compute_balance_weighted_selection(
             state, indices, seed, size=PTC_SIZE, shuffle_indices=False
         )
+    </spec>
+
+- name: get_ptc#gloas
+  sources:
+    - file: packages/state-transition/src/cache/epochCache.ts
+      search: '^\s+getPayloadTimelinessCommittee\('
+      regex: true
+  spec: |
+    <spec fn="get_ptc" fork="gloas" hash="minimal-ptc-caching">
+    def get_ptc(state: BeaconState, slot: Slot) -> Vector[ValidatorIndex, PTC_SIZE]:
+        """
+        Get the payload timeliness committee for the given ``slot``.
+        """
+        epoch = compute_epoch_at_slot(slot)
+        state_epoch = get_current_epoch(state)
+        assert epoch + 1 >= state_epoch and epoch <= state_epoch + 1
+        if epoch + 1 == state_epoch:
+            assert slot % SLOTS_PER_EPOCH == SLOTS_PER_EPOCH - 1
+            return state.previous_ptc
+        return compute_ptc(state, slot)
     </spec>
 
 - name: get_ptc_assignment#gloas

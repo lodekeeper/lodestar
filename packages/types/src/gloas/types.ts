@@ -7,6 +7,7 @@ export type BuilderPendingPayment = ValueOf<typeof ssz.BuilderPendingPayment>;
 export type PayloadAttestationData = ValueOf<typeof ssz.PayloadAttestationData>;
 export type PayloadAttestation = ValueOf<typeof ssz.PayloadAttestation>;
 export type PayloadAttestationMessage = ValueOf<typeof ssz.PayloadAttestationMessage>;
+export type PayloadTimelinessCommittee = ValueOf<typeof ssz.PayloadTimelinessCommittee>;
 export type IndexedPayloadAttestation = ValueOf<typeof ssz.IndexedPayloadAttestation>;
 export type ProposerPreferences = ValueOf<typeof ssz.ProposerPreferences>;
 export type SignedProposerPreferences = ValueOf<typeof ssz.SignedProposerPreferences>;

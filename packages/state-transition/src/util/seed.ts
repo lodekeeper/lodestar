@@ -18,7 +18,7 @@ import {
   SLOTS_PER_EPOCH,
   SYNC_COMMITTEE_SIZE,
 } from "@lodestar/params";
-import {Bytes32, DomainType, Epoch, ValidatorIndex} from "@lodestar/types";
+import {Bytes32, DomainType, Epoch, Slot, ValidatorIndex} from "@lodestar/types";
 import {assert, bytesToBigInt, bytesToInt, intToBytes} from "@lodestar/utils";
 import {EffectiveBalanceIncrements} from "../cache/effectiveBalanceIncrements.js";
 import {BeaconStateAllForks, CachedBeaconStateAllForks} from "../types.js";
@@ -266,6 +266,27 @@ export function getNextSyncCommitteeIndices(
     EFFECTIVE_BALANCE_INCREMENT,
     SHUFFLE_ROUND_COUNT
   );
+}
+
+/**
+ * Compute PTC for a single slot using the state's current effective balances.
+ */
+export function computePayloadTimelinessCommitteeAtSlot(
+  state: BeaconStateAllForks,
+  slot: Slot,
+  committees: Uint32Array[],
+  effectiveBalanceIncrements: EffectiveBalanceIncrements
+): Uint32Array {
+  const epoch = computeEpochAtSlot(slot);
+  const epochSeed = getSeed(state, epoch, DOMAIN_PTC_ATTESTER);
+  const slotSeedInput = new Uint8Array(epochSeed.length + 8);
+  slotSeedInput.set(epochSeed, 0);
+  const slotSeedView = new DataView(slotSeedInput.buffer, slotSeedInput.byteOffset, slotSeedInput.byteLength);
+
+  slotSeedView.setUint32(epochSeed.length, slot, true);
+  slotSeedView.setUint32(epochSeed.length + 4, 0, true);
+
+  return computePayloadTimelinessCommitteeForSlot(digest(slotSeedInput), committees, effectiveBalanceIncrements);
 }
 
 /**

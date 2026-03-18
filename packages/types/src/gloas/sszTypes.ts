@@ -1,4 +1,11 @@
-import {BitVectorType, ContainerType, ListBasicType, ListCompositeType, VectorCompositeType} from "@chainsafe/ssz";
+import {
+  BitVectorType,
+  ContainerType,
+  ListBasicType,
+  ListCompositeType,
+  VectorBasicType,
+  VectorCompositeType,
+} from "@chainsafe/ssz";
 import {
   BUILDER_PENDING_WITHDRAWALS_LIMIT,
   BUILDER_REGISTRY_LIMIT,
@@ -93,6 +100,8 @@ export const PayloadAttestationMessage = new ContainerType(
   },
   {typeName: "PayloadAttestationMessage", jsonCase: "eth2"}
 );
+
+export const PayloadTimelinessCommittee = new VectorBasicType(ValidatorIndex, PTC_SIZE);
 
 export const IndexedPayloadAttestation = new ContainerType(
   {
@@ -263,6 +272,7 @@ export const BeaconState = new ContainerType(
     builderPendingWithdrawals: new ListCompositeType(BuilderPendingWithdrawal, BUILDER_PENDING_WITHDRAWALS_LIMIT), // New in GLOAS:EIP7732
     latestBlockHash: Bytes32, // New in GLOAS:EIP7732
     payloadExpectedWithdrawals: capellaSsz.Withdrawals, // New in GLOAS:EIP7732
+    previousPtc: PayloadTimelinessCommittee, // New in GLOAS:EIP7732
   },
   {typeName: "BeaconState", jsonCase: "eth2"}
 );

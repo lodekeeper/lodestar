@@ -8,13 +8,14 @@ import {
   MIN_DEPOSIT_AMOUNT,
   SLOTS_PER_EPOCH,
 } from "@lodestar/params";
-import {BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
+import {BuilderIndex, Epoch, ValidatorIndex, gloas, ssz} from "@lodestar/types";
 import {AttestationData} from "@lodestar/types/phase0";
 import {byteArrayEquals} from "@lodestar/utils";
 import {CachedBeaconStateGloas} from "../types.js";
 import {getBlockRootAtSlot} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
 import {RootCache} from "./rootCache.js";
+import {computePayloadTimelinessCommitteeAtSlot} from "./seed.js";
 
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
@@ -26,6 +27,19 @@ export function getBuilderPaymentQuorumThreshold(state: CachedBeaconStateGloas):
     BUILDER_PAYMENT_THRESHOLD_NUMERATOR;
 
   return Math.floor(quorum / BUILDER_PAYMENT_THRESHOLD_DENOMINATOR);
+}
+
+export function processPtcUpdate(state: CachedBeaconStateGloas): void {
+  const slot = state.slot;
+  const slotInEpoch = slot % SLOTS_PER_EPOCH;
+  const ptc = computePayloadTimelinessCommitteeAtSlot(
+    state,
+    slot,
+    state.epochCtx.currentShuffling.committees[slotInEpoch],
+    state.epochCtx.effectiveBalanceIncrements
+  );
+
+  state.previousPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(Array.from(ptc));
 }
 
 function hasBuilderIndexFlag(index: number): boolean {

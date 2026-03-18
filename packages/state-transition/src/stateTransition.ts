@@ -1,4 +1,4 @@
-import {SLOTS_PER_EPOCH} from "@lodestar/params";
+import {ForkSeq, SLOTS_PER_EPOCH} from "@lodestar/params";
 import {Epoch, SignedBeaconBlock, SignedBlindedBeaconBlock, Slot, ssz} from "@lodestar/types";
 import {toRootHex} from "@lodestar/utils";
 import {BlockExternalData, DataAvailabilityStatus, ExecutionPayloadStatus} from "./block/externalData.js";
@@ -26,8 +26,10 @@ import {
   CachedBeaconStateDeneb,
   CachedBeaconStateElectra,
   CachedBeaconStateFulu,
+  CachedBeaconStateGloas,
   CachedBeaconStatePhase0,
 } from "./types.js";
+import {processPtcUpdate} from "./util/gloas.js";
 import {computeEpochAtSlot} from "./util/index.js";
 
 // Multifork capable state transition
@@ -232,6 +234,11 @@ function processSlotsWithTransientCache(
         const timer = metrics?.epochTransitionStepTime.startTimer({step: EpochTransitionStep.beforeProcessEpoch});
         epochTransitionCache = beforeProcessEpoch(postState, epochTransitionCacheOpts);
         timer?.();
+      }
+
+      // [New in Gloas:EIP7732] Cache last-slot PTC before epoch processing changes effective balances
+      if (fork >= ForkSeq.gloas) {
+        processPtcUpdate(postState as CachedBeaconStateGloas);
       }
 
       processEpoch(fork, postState, epochTransitionCache, metrics);
