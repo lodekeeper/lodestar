@@ -1,5 +1,4 @@
 import {
-  CachedBeaconStateGloas,
   computeEpochAtSlot,
   createSingleSignatureSetFromComponents,
   getPayloadAttestationDataSigningRoot,
@@ -69,10 +68,7 @@ async function validatePayloadAttestationMessage(
     });
   }
 
-  const state = (await chain.getHeadStateAtEpoch(
-    epoch,
-    RegenCaller.validateGossipPayloadAttestation
-  )) as CachedBeaconStateGloas;
+  const state = await chain.getHeadStateAtEpoch(epoch, RegenCaller.validateGossipPayloadAttestation);
 
   // [REJECT] The message's block `data.beacon_block_root` passes validation.
   // TODO GLOAS: implement this. Technically if we cannot get proto block from fork choice,
