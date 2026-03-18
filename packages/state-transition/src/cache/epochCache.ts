@@ -534,6 +534,9 @@ export class EpochCache {
       currentSyncCommitteeIndexed,
       nextSyncCommitteeIndexed,
       payloadTimelinessCommittees,
+      // Initialize from state.previousPtc. On mid-epoch states (e.g. checkpoint sync),
+      // this may not be the actual previous epoch's last slot PTC, but afterProcessEpoch
+      // will refresh it correctly before it's needed at the next epoch boundary.
       previousEpochLastSlotPtc:
         currentEpoch >= config.GLOAS_FORK_EPOCH
           ? Uint32Array.from((state as CachedBeaconStateGloas).previousPtc.getAll())
