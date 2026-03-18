@@ -246,6 +246,7 @@ exceptions:
     - compute_balance_weighted_acceptance#gloas
     - compute_balance_weighted_selection#gloas
     - compute_fork_version#gloas
+    - compute_ptc#gloas
     - compute_proposer_indices#gloas
     - get_ancestor#gloas
     - get_attestation_participation_flag_indices#gloas
