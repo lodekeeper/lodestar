@@ -272,7 +272,7 @@ export const BeaconState = new ContainerType(
     builderPendingWithdrawals: new ListCompositeType(BuilderPendingWithdrawal, BUILDER_PENDING_WITHDRAWALS_LIMIT), // New in GLOAS:EIP7732
     latestBlockHash: Bytes32, // New in GLOAS:EIP7732
     payloadExpectedWithdrawals: capellaSsz.Withdrawals, // New in GLOAS:EIP7732
-    previousPtc: PayloadTimelinessCommittee, // New in GLOAS:EIP7732
+    previousEpochLastPtc: PayloadTimelinessCommittee, // New in GLOAS:EIP7732
   },
   {typeName: "BeaconState", jsonCase: "eth2"}
 );

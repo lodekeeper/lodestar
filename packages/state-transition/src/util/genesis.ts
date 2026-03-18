@@ -333,8 +333,8 @@ export function initializeBeaconStateFromEth1(
     const stateGloas = state as CompositeViewDU<typeof ssz.gloas.BeaconState>;
     stateGloas.fork.previousVersion = config.GLOAS_FORK_VERSION;
     stateGloas.fork.currentVersion = config.GLOAS_FORK_VERSION;
-    // Initialize previousPtc to zeros (no previous epoch PTC at genesis)
-    stateGloas.previousPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(new Array(PTC_SIZE).fill(0));
+    // Initialize previousEpochLastPtc to zeros (no previous epoch PTC at genesis)
+    stateGloas.previousEpochLastPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(new Array(PTC_SIZE).fill(0));
   }
 
   state.commit();

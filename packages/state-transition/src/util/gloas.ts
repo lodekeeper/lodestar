@@ -39,7 +39,7 @@ export function processPtcUpdate(state: CachedBeaconStateGloas): void {
     state.epochCtx.effectiveBalanceIncrements
   );
 
-  state.previousPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(Array.from(ptc));
+  state.previousEpochLastPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(Array.from(ptc));
 }
 
 function hasBuilderIndexFlag(index: number): boolean {

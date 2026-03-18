@@ -8738,7 +8738,7 @@
         Cache the PTC for the current slot (last slot of the ending epoch)
         before effective balance updates alter the weighted selection.
         """
-        state.previous_ptc = compute_ptc(state, Slot(state.slot))
+        state.previous_epoch_last_ptc = compute_ptc(state, Slot(state.slot))
 
 - name: process_randao#phase0
   sources:

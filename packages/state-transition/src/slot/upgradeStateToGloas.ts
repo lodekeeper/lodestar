@@ -69,8 +69,8 @@ export function upgradeStateToGloas(stateFulu: CachedBeaconStateFulu): CachedBea
 
   const stateGloas = getCachedBeaconState(stateGloasView, stateFulu);
 
-  // Initialize previousPtc to zeros (no previous epoch PTC at fork boundary)
-  stateGloas.previousPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(new Array(PTC_SIZE).fill(0));
+  // Initialize previousEpochLastPtc to zeros (no previous epoch PTC at fork boundary)
+  stateGloas.previousEpochLastPtc = ssz.gloas.PayloadTimelinessCommittee.toViewDU(new Array(PTC_SIZE).fill(0));
 
   // Process pending builder deposits at the fork boundary
   onboardBuildersFromPendingDeposits(stateGloas);
