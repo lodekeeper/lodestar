@@ -196,19 +196,7 @@ export function rotatePayloadTimelinessCommittees(state: CachedBeaconStateGloas)
 }
 
 export function getPayloadTimelinessCommittee(state: CachedBeaconStateGloas, slot: Slot): Uint32Array {
-  const epoch = computeEpochAtSlot(slot);
-
-  // Fast path: use epochCtx cache (avoids state tree traversal)
-  if (epoch === state.epochCtx.epoch) {
-    return state.epochCtx.getPayloadTimelinessCommittee(slot);
-  }
-
-  // Previous epoch fallback at epoch boundary (slot + 1 === state.slot)
-  if (slot + 1 === state.slot) {
-    return Uint32Array.from(state.previousPtc.getAll());
-  }
-
-  throw new Error(`Payload Timeliness Committee is not available for slot=${slot}, state.slot=${state.slot}`);
+  return state.epochCtx.getPayloadTimelinessCommittee(slot);
 }
 
 export function getIndexedPayloadAttestation(
