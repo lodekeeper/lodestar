@@ -56,7 +56,7 @@ import {sumTargetUnslashedBalanceIncrements} from "../util/targetUnslashedBalanc
 import {EffectiveBalanceIncrements, getEffectiveBalanceIncrementsWithLen} from "./effectiveBalanceIncrements.js";
 import {EpochTransitionCache} from "./epochTransitionCache.js";
 import {PubkeyCache, createPubkeyCache, syncPubkeys} from "./pubkeyCache.js";
-import {CachedBeaconStateAllForks, CachedBeaconStateFulu} from "./stateCache.js";
+import {CachedBeaconStateAllForks, CachedBeaconStateFulu, CachedBeaconStateGloas} from "./stateCache.js";
 import {
   SyncCommitteeCache,
   SyncCommitteeCacheEmpty,
@@ -450,8 +450,8 @@ export class EpochCache {
       nextSyncCommitteeIndexed = new SyncCommitteeCacheEmpty();
     }
 
-    // Compute PTC for all slots in the prev/current epoch
-    const previousEpochLastSlotPtc = new Uint32Array(0);
+    // Compute PTC for current epoch, load previous epoch last-slot PTC from state
+    let previousEpochLastSlotPtc = new Uint32Array(0);
     let payloadTimelinessCommittees: Uint32Array[] = [];
     if (currentEpoch >= config.GLOAS_FORK_EPOCH) {
       payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
@@ -460,6 +460,8 @@ export class EpochCache {
         currentShuffling.committees,
         effectiveBalanceIncrements
       );
+      // Load cached previous epoch last-slot PTC from state (needed for epoch-boundary attestation processing)
+      previousEpochLastSlotPtc = new Uint32Array((state as CachedBeaconStateGloas).previousEpochLastPtc.getAll());
     }
 
     // Precompute churnLimit for efficient initiateValidatorExit() during block proposing MUST be recompute everytime the
