@@ -16,6 +16,7 @@ import {
   CachedBeaconStatePhase0,
   EpochTransitionCache,
 } from "../types.js";
+import {processPtcUpdate} from "../util/gloas.js";
 import {processBuilderPendingPayments} from "./processBuilderPendingPayments.js";
 import {processEffectiveBalanceUpdates} from "./processEffectiveBalanceUpdates.js";
 import {processEth1DataReset} from "./processEth1DataReset.js";
@@ -96,6 +97,11 @@ export function processEpoch(
   //  - with that and 32_000_000_000 MAX_EFFECTIVE_BALANCE or 2048_000_000_000 MAX_EFFECTIVE_BALANCE_ELECTRA, it still fits in a number given that Math.floor(Number.MAX_SAFE_INTEGER / 32_000_000_000) = 281474
   if (maxValidatorsPerStateSlashing > maxSafeValidators) {
     throw new Error("Lodestar does not support this network, parameters don't fit number value inside state.slashings");
+  }
+
+  // [New in Gloas:EIP7732] Cache last-slot PTC before effective balance updates
+  if (fork >= ForkSeq.gloas) {
+    processPtcUpdate(state as CachedBeaconStateGloas);
   }
 
   {
