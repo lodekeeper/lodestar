@@ -278,6 +278,10 @@ export function computePayloadTimelinessCommitteeAtSlot(
   effectiveBalanceIncrements: EffectiveBalanceIncrements
 ): Uint32Array {
   const epoch = computeEpochAtSlot(slot);
+  const stateEpoch = computeEpochAtSlot(state.slot);
+  if (epoch > stateEpoch) {
+    throw new Error(`compute_ptc: epoch ${epoch} > current epoch ${stateEpoch}`);
+  }
   const epochSeed = getSeed(state, epoch, DOMAIN_PTC_ATTESTER);
   const slotSeedInput = new Uint8Array(epochSeed.length + 8);
   slotSeedInput.set(epochSeed, 0);
