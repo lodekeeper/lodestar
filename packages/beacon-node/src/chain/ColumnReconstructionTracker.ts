@@ -37,14 +37,14 @@ export class ColumnReconstructionTracker {
   config: ChainForkConfig;
 
   /**
-   * Track last attempted block root
-   *
-   * This is sufficient to avoid duplicate calls since we only call this
-   * function when we see a new data column sidecar from gossip.
+   * Track last attempted block root per pipeline (Fulu vs Gloas).
+   * Separate state prevents one pipeline's in-flight reconstruction
+   * from blocking the other.
    */
-  lastBlockRootHex: string | null = null;
-  /** Track if a reconstruction attempt is in-flight */
-  running = false;
+  private fuluLastBlockRootHex: string | null = null;
+  private fuluRunning = false;
+  private gloasLastBlockRootHex: string | null = null;
+  private gloasRunning = false;
 
   private readonly minDelayMs: number;
   private readonly maxDelayMs: number;
@@ -59,18 +59,18 @@ export class ColumnReconstructionTracker {
   }
 
   triggerColumnReconstruction(blockInput: BlockInputColumns): void {
-    if (this.running) {
+    if (this.fuluRunning) {
       return;
     }
 
-    if (this.lastBlockRootHex === blockInput.blockRootHex) {
+    if (this.fuluLastBlockRootHex === blockInput.blockRootHex) {
       return;
     }
 
     // We don't care about the outcome of this call,
     // just that it has been triggered for this block root.
-    this.running = true;
-    this.lastBlockRootHex = blockInput.blockRootHex;
+    this.fuluRunning = true;
+    this.fuluLastBlockRootHex = blockInput.blockRootHex;
     const delay = this.minDelayMs + Math.random() * (this.maxDelayMs - this.minDelayMs);
     sleep(delay)
       .then(() => {
@@ -89,7 +89,7 @@ export class ColumnReconstructionTracker {
           })
           .finally(() => {
             this.logger.debug("Data column sidecar reconstruction attempt finished", logCtx);
-            this.running = false;
+            this.fuluRunning = false;
           });
       })
       .catch((err) => {
@@ -98,16 +98,16 @@ export class ColumnReconstructionTracker {
   }
 
   triggerPayloadEnvelopeReconstruction(payloadInput: PayloadEnvelopeInput, onComplete?: () => void): void {
-    if (this.running) {
+    if (this.gloasRunning) {
       return;
     }
 
-    if (this.lastBlockRootHex === payloadInput.blockRootHex) {
+    if (this.gloasLastBlockRootHex === payloadInput.blockRootHex) {
       return;
     }
 
-    this.running = true;
-    this.lastBlockRootHex = payloadInput.blockRootHex;
+    this.gloasRunning = true;
+    this.gloasLastBlockRootHex = payloadInput.blockRootHex;
     const delay = this.minDelayMs + Math.random() * (this.maxDelayMs - this.minDelayMs);
     sleep(delay)
       .then(() => {
@@ -129,7 +129,7 @@ export class ColumnReconstructionTracker {
           })
           .finally(() => {
             this.logger.debug("Gloas data column sidecar reconstruction attempt finished", logCtx);
-            this.running = false;
+            this.gloasRunning = false;
           });
       })
       .catch((err) => {
