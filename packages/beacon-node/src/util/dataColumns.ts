@@ -16,6 +16,7 @@ import {
   BeaconBlockBody,
   ColumnIndex,
   CustodyIndex,
+  DataColumnSidecar,
   Root,
   SSZTypesFor,
   SignedBeaconBlock,
@@ -24,6 +25,7 @@ import {
   deneb,
   fulu,
   gloas,
+  isGloasDataColumnSidecar,
   ssz,
 } from "@lodestar/types";
 import {bytesToBigInt} from "@lodestar/utils";
@@ -474,4 +476,28 @@ export enum DataColumnReconstructionCode {
   SuccessLate = "success_late",
   SuccessResolved = "success_resolved",
   Failed = "failed",
+}
+
+/**
+ * Get the slot from a DataColumnSidecar regardless of fork.
+ * Fulu: from signedBlockHeader.message.slot
+ * Gloas: from sidecar.slot directly
+ */
+export function getDataColumnSlot(sidecar: DataColumnSidecar): Slot {
+  if (isGloasDataColumnSidecar(sidecar)) {
+    return sidecar.slot;
+  }
+  return (sidecar as fulu.DataColumnSidecar).signedBlockHeader.message.slot;
+}
+
+/**
+ * Get the block root from a DataColumnSidecar regardless of fork.
+ * Fulu: computed from signedBlockHeader.message via hashTreeRoot
+ * Gloas: from sidecar.beaconBlockRoot directly
+ */
+export function getDataColumnBlockRoot(sidecar: DataColumnSidecar): Root {
+  if (isGloasDataColumnSidecar(sidecar)) {
+    return sidecar.beaconBlockRoot;
+  }
+  return ssz.phase0.BeaconBlockHeader.hashTreeRoot((sidecar as fulu.DataColumnSidecar).signedBlockHeader.message);
 }
