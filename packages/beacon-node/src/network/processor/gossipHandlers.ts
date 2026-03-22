@@ -606,7 +606,21 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
             peerIdStr,
           });
 
-          // If all required data is available, trigger payload processing
+          // If we have enough columns to reconstruct but not yet the sampled subset,
+          // trigger Gloas column reconstruction. On success, process the payload.
+          if (!payloadInput.hasComputedAllData() && payloadInput.columnCount >= NUMBER_OF_COLUMNS / 2) {
+            chain.columnReconstructionTracker.triggerPayloadEnvelopeReconstruction(payloadInput, () => {
+              chain.processExecutionPayload(payloadInput, {validSignature: false}).catch((e) => {
+                chain.logger.error(
+                  "Error processing execution payload after Gloas column reconstruction",
+                  {slot: dataColumnSlot, root: blockRootHex},
+                  e as Error
+                );
+              });
+            });
+          }
+
+          // If all required data is already available, trigger payload processing immediately
           if (payloadInput.isComplete()) {
             chain.processExecutionPayload(payloadInput, {validSignature: false}).catch((e) => {
               chain.logger.error(

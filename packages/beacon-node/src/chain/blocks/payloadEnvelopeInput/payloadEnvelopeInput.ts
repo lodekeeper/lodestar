@@ -248,6 +248,22 @@ export class PayloadEnvelopeInput {
     return columns;
   }
 
+  get columnCount(): number {
+    return this.columnsCache.size;
+  }
+
+  hasColumn(columnIndex: number): boolean {
+    return this.columnsCache.has(columnIndex);
+  }
+
+  getAllColumnsWithSource(): ColumnWithSource[] {
+    return [...this.columnsCache.values()];
+  }
+
+  getAllColumns(): gloas.DataColumnSidecars {
+    return this.getAllColumnsWithSource().map(({columnSidecar}) => columnSidecar);
+  }
+
   getSampledColumnsWithSource(): ColumnWithSource[] {
     const columns: ColumnWithSource[] = [];
     for (const index of this.sampledColumns) {

@@ -31,10 +31,12 @@ import {
 import {bytesToBigInt} from "@lodestar/utils";
 import {BlockInputColumns} from "../chain/blocks/blockInput/blockInput.js";
 import {BlockInputSource} from "../chain/blocks/blockInput/types.js";
+import {PayloadEnvelopeInput} from "../chain/blocks/payloadEnvelopeInput/payloadEnvelopeInput.js";
+import {PayloadEnvelopeInputSource} from "../chain/blocks/payloadEnvelopeInput/types.js";
 import {ChainEvent, ChainEventEmitter} from "../chain/emitter.js";
 import {Metrics} from "../metrics/metrics.js";
 import {NodeId} from "../network/subnets/index.js";
-import {dataColumnMatrixRecovery} from "./blobs.js";
+import {dataColumnMatrixRecovery, dataColumnMatrixRecoveryGloas} from "./blobs.js";
 import {kzg} from "./kzg.js";
 
 export enum RecoverResult {
@@ -466,6 +468,68 @@ export async function recoverDataColumnSidecars(
   metrics?.dataColumns.bySource.inc({source: BlockInputSource.recovery}, sidecarsToPublish.length);
   emitter.emit(ChainEvent.publishDataColumns, sidecarsToPublish);
   // TODO: Can we record dataColumns.sentPeersPerSubnet metric somehow
+  return DataColumnReconstructionCode.SuccessResolved;
+}
+
+/**
+ * Recover missing sampled/custody columns for a Gloas PayloadEnvelopeInput once
+ * at least half the columns are available. Reconstructed columns are added back
+ * to the payload input and published as normal data column sidecars.
+ */
+export async function recoverGloasDataColumnSidecars(
+  payloadInput: PayloadEnvelopeInput,
+  emitter: ChainEventEmitter,
+  metrics: Metrics | null
+): Promise<DataColumnReconstructionCode> {
+  const existingColumns = payloadInput.getAllColumnsWithSource();
+  const columnCount = existingColumns.length;
+  if (columnCount >= NUMBER_OF_COLUMNS) {
+    return DataColumnReconstructionCode.NotAttemptedAlreadyFull;
+  }
+
+  if (columnCount < NUMBER_OF_COLUMNS / 2) {
+    return DataColumnReconstructionCode.NotAttemptedHaveLessThanHalf;
+  }
+
+  metrics?.recoverDataColumnSidecars.custodyBeforeReconstruction.set(columnCount);
+  const partialSidecars = new Map<number, gloas.DataColumnSidecar>();
+  for (const {columnSidecar} of existingColumns) {
+    if (partialSidecars.size >= NUMBER_OF_COLUMNS / 2) {
+      break;
+    }
+    partialSidecars.set(columnSidecar.index, columnSidecar);
+  }
+
+  const timer = metrics?.peerDas.dataColumnsReconstructionTime.startTimer();
+  const fullSidecars = await dataColumnMatrixRecoveryGloas(
+    partialSidecars,
+    payloadInput.getBlobKzgCommitments().length
+  ).catch(() => null);
+  timer?.();
+  if (fullSidecars == null) {
+    return DataColumnReconstructionCode.NullReturned;
+  }
+
+  if (payloadInput.getAllColumns().length === NUMBER_OF_COLUMNS) {
+    metrics?.dataColumns.alreadyAdded.inc(fullSidecars.length);
+    return DataColumnReconstructionCode.SuccessLate;
+  }
+
+  const sidecarsToPublish: gloas.DataColumnSidecars = [];
+  for (const columnSidecar of fullSidecars) {
+    if (!payloadInput.hasColumn(columnSidecar.index)) {
+      payloadInput.addColumn({
+        columnSidecar,
+        seenTimestampSec: Date.now() / 1000,
+        source: PayloadEnvelopeInputSource.recovery,
+      });
+      sidecarsToPublish.push(columnSidecar);
+    }
+  }
+
+  metrics?.peerDas.reconstructedColumns.inc(sidecarsToPublish.length);
+  metrics?.dataColumns.bySource.inc({source: BlockInputSource.recovery}, sidecarsToPublish.length);
+  emitter.emit(ChainEvent.publishDataColumns, sidecarsToPublish);
   return DataColumnReconstructionCode.SuccessResolved;
 }
 

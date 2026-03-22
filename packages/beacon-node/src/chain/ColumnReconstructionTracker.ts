@@ -1,8 +1,13 @@
 import {ChainForkConfig} from "@lodestar/config";
 import {Logger, sleep} from "@lodestar/utils";
 import {Metrics} from "../metrics/metrics.js";
-import {DataColumnReconstructionCode, recoverDataColumnSidecars} from "../util/dataColumns.js";
+import {
+  DataColumnReconstructionCode,
+  recoverDataColumnSidecars,
+  recoverGloasDataColumnSidecars,
+} from "../util/dataColumns.js";
 import {BlockInputColumns} from "./blocks/blockInput/index.js";
+import {PayloadEnvelopeInput} from "./blocks/payloadEnvelopeInput/index.js";
 import {ChainEventEmitter} from "./emitter.js";
 
 /**
@@ -84,6 +89,46 @@ export class ColumnReconstructionTracker {
           })
           .finally(() => {
             this.logger.debug("Data column sidecar reconstruction attempt finished", logCtx);
+            this.running = false;
+          });
+      })
+      .catch((err) => {
+        this.logger.debug("ColumnReconstructionTracker unreachable error", {}, err);
+      });
+  }
+
+  triggerPayloadEnvelopeReconstruction(payloadInput: PayloadEnvelopeInput, onComplete?: () => void): void {
+    if (this.running) {
+      return;
+    }
+
+    if (this.lastBlockRootHex === payloadInput.blockRootHex) {
+      return;
+    }
+
+    this.running = true;
+    this.lastBlockRootHex = payloadInput.blockRootHex;
+    const delay = this.minDelayMs + Math.random() * (this.maxDelayMs - this.minDelayMs);
+    sleep(delay)
+      .then(() => {
+        const logCtx = {slot: payloadInput.slot, root: payloadInput.blockRootHex};
+        this.logger.debug("Attempting Gloas data column sidecar reconstruction", logCtx);
+        recoverGloasDataColumnSidecars(payloadInput, this.emitter, this.metrics)
+          .then((result) => {
+            this.metrics?.recoverDataColumnSidecars.reconstructionResult.inc({result});
+            this.logger.debug("Gloas data column sidecar reconstruction complete", {...logCtx, result});
+            if (result === DataColumnReconstructionCode.SuccessResolved && payloadInput.isComplete()) {
+              onComplete?.();
+            }
+          })
+          .catch((e) => {
+            this.metrics?.recoverDataColumnSidecars.reconstructionResult.inc({
+              result: DataColumnReconstructionCode.Failed,
+            });
+            this.logger.debug("Error during Gloas data column sidecar reconstruction", logCtx, e as Error);
+          })
+          .finally(() => {
+            this.logger.debug("Gloas data column sidecar reconstruction attempt finished", logCtx);
             this.running = false;
           });
       })
