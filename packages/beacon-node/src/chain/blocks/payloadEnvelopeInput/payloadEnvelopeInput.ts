@@ -290,8 +290,13 @@ export class PayloadEnvelopeInput {
     return this.state.timeCompleteSec;
   }
 
+  /**
+   * Payload import is only safe once the payload envelope is present AND the sampled
+   * columns are actually available (or no columns are required). Merely having enough
+   * columns to reconstruct later is not sufficient until reconstruction has run.
+   */
   isComplete(): boolean {
-    return this.state.hasPayload && this.state.hasAllData;
+    return this.state.hasPayload && this.state.hasComputedAllData;
   }
 
   async waitForData(): Promise<gloas.SignedExecutionPayloadEnvelope> {
