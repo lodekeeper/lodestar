@@ -1,5 +1,6 @@
 import {routes} from "@lodestar/api";
 import {BeaconConfig, ChainForkConfig} from "@lodestar/config";
+import {PayloadStatus} from "@lodestar/fork-choice";
 import {
   ForkName,
   ForkPostDeneb,
@@ -574,18 +575,14 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
 
         const delaySec = chain.clock.secFromSlot(dataColumnSlot, seenTimestampSec);
 
-        // Check if this column was already seen via PayloadEnvelopeInput
+        // Check if this column was already seen via PayloadEnvelopeInput (dedup)
         const existingPayloadInput = chain.seenPayloadEnvelopeInputCache.get(blockRootHex);
-        if (existingPayloadInput) {
-          // Check if column already tracked (dedup)
-          const existingColumns = existingPayloadInput.getSampledColumns();
-          if (existingColumns.some((c) => c.index === index)) {
-            throw new DataColumnSidecarGossipError(GossipAction.IGNORE, {
-              code: DataColumnSidecarErrorCode.ALREADY_KNOWN,
-              columnIndex: index,
-              slot: dataColumnSlot,
-            });
-          }
+        if (existingPayloadInput?.hasColumn(index)) {
+          throw new DataColumnSidecarGossipError(GossipAction.IGNORE, {
+            code: DataColumnSidecarErrorCode.ALREADY_KNOWN,
+            columnIndex: index,
+            slot: dataColumnSlot,
+          });
         }
 
         // Validate the Gloas data column sidecar
@@ -631,10 +628,22 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
             });
           }
         } else {
-          // PayloadEnvelopeInput not yet created (block not yet imported).
-          // The sidecar was validated and re-broadcast, but we can't track it yet.
-          // It will be re-fetched via reqresp when the block arrives and creates
-          // the PayloadEnvelopeInput (TODO: deferred column queue for optimization).
+          // PayloadEnvelopeInput not in cache. Two possible reasons:
+          // 1. Block was already fully processed and cache was pruned → IGNORE
+          // 2. Block imported but payload not yet arrived → deferred
+          const protoBlock = chain.forkChoice.getBlockHexDefaultStatus(blockRootHex);
+          if (protoBlock && protoBlock.payloadStatus !== PayloadStatus.PENDING) {
+            // Payload already processed (FULL/EMPTY) — late-arriving column, ignore
+            throw new DataColumnSidecarGossipError(GossipAction.IGNORE, {
+              code: DataColumnSidecarErrorCode.ALREADY_KNOWN,
+              columnIndex: index,
+              slot: dataColumnSlot,
+            });
+          }
+          // Block imported but payload not yet arrived — column is early.
+          // Validated and re-broadcast, but can't track it yet.
+          // Will need to be re-fetched when payload processing needs it (TODO: Gloas reqresp sync).
+          // TODO: deferred column queue for optimization
           chain.logger.debug("Validated Gloas column but PayloadEnvelopeInput not yet created", {
             slot: dataColumnSlot,
             blockRoot: blockRootHex,

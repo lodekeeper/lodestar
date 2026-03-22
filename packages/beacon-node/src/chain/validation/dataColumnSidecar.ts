@@ -3,6 +3,7 @@ import {
   KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH,
   KZG_COMMITMENTS_SUBTREE_INDEX,
   NUMBER_OF_COLUMNS,
+  isForkPostGloas,
 } from "@lodestar/params";
 import {
   computeEpochAtSlot,
@@ -593,6 +594,15 @@ export async function validateGossipGloasDataColumnSidecar(
       code: DataColumnSidecarErrorCode.BLOCK_UNKNOWN,
       blockRoot: blockRootHex,
       slot,
+    });
+  }
+  // Verify the referenced block is actually a Gloas block (prevents pre-Gloas body crash)
+  const blockFork = chain.config.getForkName(blockResult.block.message.slot);
+  if (!isForkPostGloas(blockFork)) {
+    throw new DataColumnSidecarGossipError(GossipAction.REJECT, {
+      code: DataColumnSidecarErrorCode.SLOT_MISMATCH,
+      expectedSlot: slot,
+      sidecarSlot: blockResult.block.message.slot,
     });
   }
   const blockBody = blockResult.block.message.body as gloas.BeaconBlockBody;
