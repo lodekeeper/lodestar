@@ -56,14 +56,14 @@ import {sumTargetUnslashedBalanceIncrements} from "../util/targetUnslashedBalanc
 import {EffectiveBalanceIncrements, getEffectiveBalanceIncrementsWithLen} from "./effectiveBalanceIncrements.js";
 import {EpochTransitionCache} from "./epochTransitionCache.js";
 import {PubkeyCache, createPubkeyCache, syncPubkeys} from "./pubkeyCache.js";
-import {CachedBeaconStateAllForks, CachedBeaconStateFulu} from "./stateCache.js";
+import {CachedBeaconStateAllForks, CachedBeaconStateFulu, CachedBeaconStateGloas} from "./stateCache.js";
 import {
   SyncCommitteeCache,
   SyncCommitteeCacheEmpty,
   computeSyncCommitteeCache,
   getSyncCommitteeCache,
 } from "./syncCommitteeCache.js";
-import {BeaconStateAllForks, BeaconStateAltair, ShufflingGetter} from "./types.js";
+import {BeaconStateAllForks, BeaconStateAltair, BeaconStateGloas, ShufflingGetter} from "./types.js";
 
 /** `= PROPOSER_WEIGHT / (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT)` */
 export const PROPOSER_WEIGHT_FACTOR = PROPOSER_WEIGHT / (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT);
@@ -451,24 +451,33 @@ export class EpochCache {
       nextSyncCommitteeIndexed = new SyncCommitteeCacheEmpty();
     }
 
-    // Compute PTC for all slots in the prev/current epoch
+    // Read PTC from state's ptcWindow (populated during epoch transitions and fork upgrades)
+    // At genesis, ptcWindow is not yet populated, so compute from scratch
     let previousPayloadTimelinessCommittees: Uint32Array[] = [];
     let payloadTimelinessCommittees: Uint32Array[] = [];
     if (currentEpoch >= config.GLOAS_FORK_EPOCH) {
-      payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-        state,
-        currentEpoch,
-        currentShuffling.committees,
-        effectiveBalanceIncrements
-      );
-
-      if (!isGenesis && previousEpoch >= config.GLOAS_FORK_EPOCH) {
-        previousPayloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
+      if (isGenesis) {
+        payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
           state,
-          previousEpoch,
-          previousShuffling.committees,
+          currentEpoch,
+          currentShuffling.committees,
           effectiveBalanceIncrements
         );
+      } else {
+        const ptcWindowAll = (state as BeaconStateGloas).ptcWindow;
+        // Current epoch is at offset SLOTS_PER_EPOCH in the window
+        payloadTimelinessCommittees = [];
+        for (let i = 0; i < SLOTS_PER_EPOCH; i++) {
+          payloadTimelinessCommittees.push(new Uint32Array(ptcWindowAll.get(SLOTS_PER_EPOCH + i).getAll()));
+        }
+
+        if (previousEpoch >= config.GLOAS_FORK_EPOCH) {
+          // Previous epoch is at offset 0 in the window
+          previousPayloadTimelinessCommittees = [];
+          for (let i = 0; i < SLOTS_PER_EPOCH; i++) {
+            previousPayloadTimelinessCommittees.push(new Uint32Array(ptcWindowAll.get(i).getAll()));
+          }
+        }
       }
     }
 
@@ -702,14 +711,14 @@ export class EpochCache {
 
     this.proposersPrevEpoch = this.proposers;
     if (upcomingEpoch >= this.config.GLOAS_FORK_EPOCH) {
-      // Shift and compute current epoch PTC eagerly for all slots
+      // PTC was updated by processPtcWindow — read from state
       this.previousPayloadTimelinessCommittees = this.payloadTimelinessCommittees;
-      this.payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-        state,
-        upcomingEpoch,
-        this.currentShuffling.committees,
-        this.effectiveBalanceIncrements
-      );
+      // Current epoch PTC is at offset SLOTS_PER_EPOCH in the window
+      const ptcWindowAll = (state as CachedBeaconStateGloas).ptcWindow;
+      this.payloadTimelinessCommittees = [];
+      for (let i = 0; i < SLOTS_PER_EPOCH; i++) {
+        this.payloadTimelinessCommittees.push(new Uint32Array(ptcWindowAll.get(SLOTS_PER_EPOCH + i).getAll()));
+      }
     }
     if (upcomingEpoch >= this.config.FULU_FORK_EPOCH) {
       // Populate proposer cache with lookahead from state

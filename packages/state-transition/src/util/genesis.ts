@@ -19,6 +19,7 @@ import {BeaconStateAllForks, CachedBeaconStateAllForks, CachedBeaconStateElectra
 import {newFilledArray} from "./array.js";
 import {getTemporaryBlockHeader} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
+import {initializePtcWindow} from "./gloas.js";
 import {getNextSyncCommittee} from "./syncCommittee.js";
 import {getActiveValidatorIndices, getMaxEffectiveBalance} from "./validator.js";
 
@@ -332,6 +333,7 @@ export function initializeBeaconStateFromEth1(
     const stateGloas = state as CompositeViewDU<typeof ssz.gloas.BeaconState>;
     stateGloas.fork.previousVersion = config.GLOAS_FORK_VERSION;
     stateGloas.fork.currentVersion = config.GLOAS_FORK_VERSION;
+    stateGloas.ptcWindow = ssz.gloas.PtcWindow.toViewDU(initializePtcWindow(state));
   }
 
   state.commit();

@@ -6,15 +6,18 @@ import {
   EFFECTIVE_BALANCE_INCREMENT,
   FAR_FUTURE_EPOCH,
   MIN_DEPOSIT_AMOUNT,
+  MIN_SEED_LOOKAHEAD,
+  PTC_SIZE,
   SLOTS_PER_EPOCH,
 } from "@lodestar/params";
 import {BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
 import {AttestationData} from "@lodestar/types/phase0";
 import {byteArrayEquals} from "@lodestar/utils";
-import {CachedBeaconStateGloas} from "../types.js";
+import {CachedBeaconStateAllForks, CachedBeaconStateGloas} from "../types.js";
 import {getBlockRootAtSlot} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
 import {RootCache} from "./rootCache.js";
+import {computePayloadTimelinessCommitteesForEpoch} from "./seed.js";
 
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
@@ -169,4 +172,42 @@ export function isAttestationSameSlotRootCache(rootCache: RootCache, data: Attes
 
 export function isParentBlockFull(state: CachedBeaconStateGloas): boolean {
   return byteArrayEquals(state.latestExecutionPayloadBid.blockHash, state.latestBlockHash);
+}
+
+/**
+ * Return the PTC assignments for the full ptc_window starting from the previous epoch.
+ * Used to initialize the `ptc_window` field in the beacon state at genesis and after forks.
+ *
+ * Window layout: [prev_epoch (zeros), current_epoch, ..., current_epoch + MIN_SEED_LOOKAHEAD]
+ */
+export function initializePtcWindow(state: CachedBeaconStateAllForks): number[][] {
+  const currentEpoch = state.epochCtx.epoch;
+
+  // Previous epoch slots filled with zeros (no valid PTC data before fork/genesis)
+  const emptyPrevEpoch: number[][] = Array.from({length: SLOTS_PER_EPOCH}, () => Array.from(new Uint32Array(PTC_SIZE)));
+
+  // Compute PTC for current epoch through current + MIN_SEED_LOOKAHEAD
+  const ptcs: number[][] = [];
+  for (let e = 0; e <= MIN_SEED_LOOKAHEAD; e++) {
+    const epoch = currentEpoch + e;
+
+    // Get shuffling from epochCtx cache when available
+    const shuffling = state.epochCtx.getShufflingAtEpochOrNull(epoch);
+    if (shuffling == null) {
+      throw new Error(`Shuffling not available for epoch ${epoch} during PTC window initialization`);
+    }
+
+    const epochPtcs = computePayloadTimelinessCommitteesForEpoch(
+      state,
+      epoch,
+      shuffling.committees,
+      state.epochCtx.effectiveBalanceIncrements
+    );
+    // Convert Uint32Array[] to number[][] for SSZ serialization
+    for (const ptc of epochPtcs) {
+      ptcs.push(Array.from(ptc));
+    }
+  }
+
+  return [...emptyPrevEpoch, ...ptcs];
 }

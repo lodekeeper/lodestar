@@ -90,3 +90,8 @@ temp/
 # Local development artifacts
 .venv/
 checkpoint_states/
+
+# Agent working files
+TASK.md
+CODING_CONTEXT.md
+ANALYSIS.md

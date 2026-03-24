@@ -282,7 +282,7 @@ function processSlotsWithTransientCache(
 
       {
         const timer = metrics?.epochTransitionStepTime.startTimer({step: EpochTransitionStep.finalProcessEpoch});
-        // last step to prepare epoch data that depends on the upgraded state, for example proposerLookahead of BeaconStateFulu
+        // last step to prepare epoch data that depends on the upgraded state, for example proposerLookahead of BeaconStateFulu and ptcWindow of BeaconStateGloas
         postState.epochCtx.finalProcessEpoch(postState);
         timer?.();
       }
