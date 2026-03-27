@@ -2,6 +2,7 @@ import {EventEmitter} from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import {generateKeyPair} from "@libp2p/crypto/keys";
+import jsyaml from "js-yaml";
 import snappy from "snappy";
 import {expect} from "vitest";
 import {chainConfigFromJson, chainConfigTypes, createBeaconConfig} from "@lodestar/config";
@@ -33,6 +34,7 @@ import {validateGossipAggregateAndProof} from "../../../src/chain/validation/agg
 import {GossipAttestation, validateGossipAttestationsSameAttData} from "../../../src/chain/validation/attestation.js";
 import {validateGossipAttesterSlashing} from "../../../src/chain/validation/attesterSlashing.js";
 import {validateGossipBlock} from "../../../src/chain/validation/block.js";
+import {validateGossipBlsToExecutionChange} from "../../../src/chain/validation/blsToExecutionChange.js";
 import {validateGossipProposerSlashing} from "../../../src/chain/validation/proposerSlashing.js";
 import {validateGossipSyncCommittee} from "../../../src/chain/validation/syncCommittee.js";
 import {validateSyncCommitteeGossipContributionAndProof} from "../../../src/chain/validation/syncCommitteeContributionAndProof.js";
@@ -157,6 +159,7 @@ const gossipTopicByHandler = {
   gossip_voluntary_exit: GossipType.voluntary_exit,
   gossip_sync_committee_message: GossipType.sync_committee,
   gossip_sync_committee_contribution_and_proof: GossipType.sync_committee_contribution_and_proof,
+  gossip_bls_to_execution_change: GossipType.bls_to_execution_change,
 } as const satisfies Record<string, GossipType>;
 
 export function isGossipValidationHandler(topicHandler: string): topicHandler is keyof typeof gossipTopicByHandler {
@@ -179,7 +182,11 @@ function loadTestCaseChainConfig(testCaseDir: string, fork: ForkName) {
   const configPath = path.join(testCaseDir, "config.yaml");
   if (!fs.existsSync(configPath)) return getConfig(fork);
 
-  const parsed = loadYaml<Record<string, unknown>>(fs.readFileSync(configPath, "utf8"));
+  // Parse config scalars as raw strings so byte values such as `0x00000001`
+  // keep their leading zeros before passing through `chainConfigFromJson()`.
+  const parsed = jsyaml.load(fs.readFileSync(configPath, "utf8"), {
+    schema: jsyaml.FAILSAFE_SCHEMA,
+  }) as Record<string, unknown>;
   const configJson: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(parsed)) {
@@ -677,6 +684,19 @@ async function validateMessageForTopic(
         ssz.altair.SignedContributionAndProof.deserialize(bytes)
       );
       await validateSyncCommitteeGossipContributionAndProof(chain, signedContributionAndProof);
+      break;
+    }
+
+    case GossipType.bls_to_execution_change: {
+      if (chain.clock.currentEpoch < chain.config.CAPELLA_FORK_EPOCH) {
+        throw new GossipActionError(GossipAction.IGNORE, {code: "SPEC_PRE_CAPELLA"});
+      }
+
+      const change = rejectOnInvalidSerializedBytes(() =>
+        sszTypesFor(fork).SignedBLSToExecutionChange.deserialize(bytes)
+      );
+      await validateGossipBlsToExecutionChange(chain, change);
+      chain.opPool.insertBlsToExecutionChange(change);
       break;
     }
 
