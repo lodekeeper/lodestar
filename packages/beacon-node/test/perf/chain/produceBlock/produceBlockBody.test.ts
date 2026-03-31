@@ -3,7 +3,7 @@ import {afterAll, beforeAll, bench, describe} from "@chainsafe/benchmark";
 import {LevelDbController} from "@lodestar/db/controller/level";
 import {testLogger} from "@lodestar/logger/test-utils";
 import {BeaconStateView, CachedBeaconStateElectra} from "@lodestar/state-transition";
-import {clearPerfStateCache, generatePerfTestCachedStateElectra} from "@lodestar/state-transition/test-utils";
+import {generatePerfTestCachedStateElectra} from "@lodestar/state-transition/test-utils";
 import {toRootHex} from "@lodestar/utils";
 import {defaultOptions as defaultValidatorOptions} from "@lodestar/validator";
 import {BeaconChain} from "../../../../src/chain/index.js";
@@ -90,7 +90,6 @@ describe("produceBlockBody", () => {
     chain = undefined;
     state = undefined;
     stateOg = undefined;
-    clearPerfStateCache();
   });
 
   bench({

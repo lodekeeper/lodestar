@@ -9,7 +9,7 @@ import {
   MAX_VOLUNTARY_EXITS,
 } from "@lodestar/params";
 import {BeaconStateView, CachedBeaconStateAltair, PubkeyCache} from "@lodestar/state-transition";
-import {clearPerfStateCache, generatePerfTestCachedStateAltair} from "@lodestar/state-transition/test-utils";
+import {generatePerfTestCachedStateAltair} from "@lodestar/state-transition/test-utils";
 import {ssz} from "@lodestar/types";
 import {BlockType} from "../../../../src/chain/interface.js";
 import {OpPool} from "../../../../src/chain/opPools/opPool.js";
@@ -38,7 +38,6 @@ describe("opPool", () => {
 
   afterAll(() => {
     originalState = undefined;
-    clearPerfStateCache();
   });
 
   bench({

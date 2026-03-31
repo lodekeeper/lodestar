@@ -12,7 +12,7 @@ import {
   getBlockRootAtSlot,
   newFilledArray,
 } from "@lodestar/state-transition";
-import {clearPerfStateCache, generatePerfTestCachedStateElectra} from "@lodestar/state-transition/test-utils";
+import {generatePerfTestCachedStateElectra} from "@lodestar/state-transition/test-utils";
 import {electra, ssz} from "@lodestar/types";
 import {AggregatedAttestationPool} from "../../../../src/chain/opPools/aggregatedAttestationPool.js";
 import {ShufflingCache} from "../../../../src/chain/shufflingCache.js";
@@ -167,7 +167,6 @@ describe(`getAttestationsForBlock vc=${vc}`, () => {
     originalState = undefined;
     protoArray = undefined;
     forkchoice = undefined;
-    clearPerfStateCache();
   });
 
   // notSeenSlots should be >=1
