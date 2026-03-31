@@ -87,3 +87,4 @@ temp/
 # Local development artifacts
 .venv/
 checkpoint_states/
+BACKLOG.md

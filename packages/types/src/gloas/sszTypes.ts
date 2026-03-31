@@ -1,4 +1,5 @@
 import {
+  BitListType,
   BitVectorType,
   ContainerType,
   ListBasicType,
@@ -10,6 +11,7 @@ import {
   BUILDER_PENDING_WITHDRAWALS_LIMIT,
   BUILDER_REGISTRY_LIMIT,
   HISTORICAL_ROOTS_LIMIT,
+  MAX_BLOB_COMMITMENTS_PER_BLOCK,
   MAX_PAYLOAD_ATTESTATIONS,
   MIN_SEED_LOOKAHEAD,
   NUMBER_OF_COLUMNS,
@@ -302,5 +304,48 @@ export const DataColumnSidecar = new ContainerType(
 );
 
 export const DataColumnSidecars = new ListCompositeType(DataColumnSidecar, NUMBER_OF_COLUMNS);
+
+// Cell-level dissemination types (Fulu feature carried forward into Gloas)
+
+/**
+ * Modified PartialDataColumnHeader for Gloas.
+ * Removes signed_block_header and kzg_commitments_inclusion_proof from Fulu version.
+ * Adds slot and beacon_block_root.
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.4/specs/gloas/p2p-interface.md#modified-partialdatacolumnheader
+ */
+export const PartialDataColumnHeader = new ContainerType(
+  {
+    kzgCommitments: denebSsz.BlobKzgCommitments,
+    slot: Slot,
+    beaconBlockRoot: Root,
+  },
+  {typeName: "PartialDataColumnHeader", jsonCase: "eth2"}
+);
+
+/**
+ * PartialDataColumnPartsMetadata.
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.4/specs/fulu/p2p-interface.md#partialdatacolumnpartsmetadata
+ */
+export const PartialDataColumnPartsMetadata = new ContainerType(
+  {
+    available: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
+    requests: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
+  },
+  {typeName: "PartialDataColumnPartsMetadata", jsonCase: "eth2"}
+);
+
+/**
+ * PartialDataColumnSidecar.
+ * Spec: https://github.com/ethereum/consensus-specs/blob/v1.7.0-alpha.4/specs/fulu/p2p-interface.md#partialdatacolumnsidecar
+ */
+export const PartialDataColumnSidecar = new ContainerType(
+  {
+    cellsPresentBitmap: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
+    partialColumn: new ListCompositeType(fuluSsz.Cell, MAX_BLOB_COMMITMENTS_PER_BLOCK),
+    kzgProofs: new ListCompositeType(denebSsz.KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK),
+    header: new ListCompositeType(PartialDataColumnHeader, 1),
+  },
+  {typeName: "PartialDataColumnSidecar", jsonCase: "eth2"}
+);
 
 // Req/Resp types (ExecutionPayloadEnvelopesByRangeRequest defined above)
