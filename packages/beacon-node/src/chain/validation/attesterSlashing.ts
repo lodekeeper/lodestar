@@ -2,6 +2,7 @@ import {
   assertValidAttesterSlashing,
   getAttesterSlashableIndices,
   getAttesterSlashingSignatureSets,
+  isSlashableValidator,
 } from "@lodestar/state-transition";
 import {AttesterSlashing} from "@lodestar/types";
 import {AttesterSlashingError, AttesterSlashingErrorCode, GossipAction} from "../errors/index.js";
@@ -51,6 +52,14 @@ export async function validateAttesterSlashing(
       attesterSlashing,
       false
     );
+
+    if (
+      !intersectingIndices.some((index) =>
+        isSlashableValidator(state.validators.getReadonly(index), state.epochCtx.epoch)
+      )
+    ) {
+      throw new Error("AttesterSlashing did not result in any slashings");
+    }
   } catch (e) {
     throw new AttesterSlashingError(GossipAction.REJECT, {
       code: AttesterSlashingErrorCode.INVALID,
