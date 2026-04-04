@@ -772,10 +772,11 @@ function preparePayloadAttributes(
       throw new Error("Expected Capella state for withdrawals");
     }
 
-    // For Gloas, skip withdrawals when parent block is not full (EIP-7732)
-    // processWithdrawals returns early when parent is empty, so the EL should not include them
+    // For Gloas with an empty parent, processWithdrawals returns early without updating
+    // payloadExpectedWithdrawals, so the EL must receive the stale value from state.
     if (ForkSeq[fork] >= ForkSeq.gloas && isStatePostGloas(prepareState) && !isParentBlockFull(prepareState)) {
-      (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals = [];
+      (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals =
+        prepareState.getPayloadExpectedWithdrawals();
     } else {
       // withdrawals logic is now fork aware as it changes on electra fork post capella
       (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals =

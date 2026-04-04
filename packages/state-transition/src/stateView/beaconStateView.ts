@@ -415,6 +415,14 @@ export class BeaconStateView implements IBeaconStateViewLatestFork {
     return ptcCommittee.indexOf(validatorIndex);
   }
 
+  getPayloadExpectedWithdrawals(): capella.Withdrawal[] {
+    if (this.config.getForkSeq(this.cachedState.slot) < ForkSeq.gloas) {
+      throw new Error("payloadExpectedWithdrawals is not available before GLOAS");
+    }
+
+    return Array.from((this.cachedState as CachedBeaconStateGloas).payloadExpectedWithdrawals.getAllReadonly());
+  }
+
   // Shuffling and committees
 
   getShufflingAtEpoch(epoch: Epoch): EpochShuffling {

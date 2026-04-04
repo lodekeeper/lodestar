@@ -48,7 +48,7 @@ describe("getExpectedWithdrawals", () => {
 });
 
 describe("processWithdrawals", () => {
-  it("clears payloadExpectedWithdrawals for gloas when the parent block is not full", () => {
+  it("keeps stale payloadExpectedWithdrawals for gloas when the parent block is not full", () => {
     const state = {
       latestExecutionPayloadBid: {blockHash: new Uint8Array(32).fill(1)},
       latestBlockHash: new Uint8Array(32).fill(2),
@@ -62,8 +62,10 @@ describe("processWithdrawals", () => {
       ]),
     };
 
+    const stale = Array.from(state.payloadExpectedWithdrawals.getAllReadonly());
+
     processWithdrawals(ForkSeq.gloas, state as unknown as Parameters<typeof processWithdrawals>[1]);
 
-    expect(state.payloadExpectedWithdrawals.length).toBe(0);
+    expect(Array.from(state.payloadExpectedWithdrawals.getAllReadonly())).toEqual(stale);
   });
 });
