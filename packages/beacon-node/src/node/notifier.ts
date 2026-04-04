@@ -1,6 +1,6 @@
 import {BeaconConfig} from "@lodestar/config";
-import {ExecutionStatus, ProtoBlock} from "@lodestar/fork-choice";
-import {EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH} from "@lodestar/params";
+import {ExecutionStatus, PayloadStatus, ProtoBlock} from "@lodestar/fork-choice";
+import {EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH, isForkPostGloas} from "@lodestar/params";
 import {
   IBeaconStateView,
   computeEpochAtSlot,
@@ -167,6 +167,13 @@ function getHeadExecutionInfo(
     return [];
   }
 
+  const fork = config.getForkName(headInfo.slot);
+
+  // Gloas: show payload status (PENDING/EMPTY/FULL) instead of EL execution status
+  if (isForkPostGloas(fork)) {
+    return getGloasExecutionInfo(headInfo);
+  }
+
   const executionStatusStr = headInfo.executionStatus.toLowerCase();
 
   // Add execution status to notifier only if head is on/post bellatrix
@@ -186,4 +193,22 @@ function getHeadExecutionInfo(
   }
 
   return [];
+}
+
+/** Gloas-specific execution info showing payload status and block details */
+function getGloasExecutionInfo(headInfo: ProtoBlock): string[] {
+  const payloadStatusStr =
+    headInfo.payloadStatus === PayloadStatus.FULL
+      ? "full"
+      : headInfo.payloadStatus === PayloadStatus.EMPTY
+        ? "empty"
+        : "pending";
+
+  if (headInfo.payloadStatus === PayloadStatus.FULL && headInfo.executionPayloadBlockHash !== null) {
+    const hashInfo = prettyBytesShort(headInfo.executionPayloadBlockHash);
+    const numberInfo = headInfo.executionPayloadNumber;
+    return [`payload: ${payloadStatusStr}(${numberInfo} ${hashInfo})`];
+  }
+
+  return [`payload: ${payloadStatusStr}`];
 }
