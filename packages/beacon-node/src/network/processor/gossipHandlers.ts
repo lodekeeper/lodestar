@@ -1141,7 +1141,6 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
       const executionPayloadBid = sszDeserialize(topic, serializedData);
       await validateGossipExecutionPayloadBid(chain, executionPayloadBid);
 
-      // Emit SSE event for valid gossip-validated bid
       chain.emitter.emit(routes.events.EventType.executionPayloadBid, {
         version: config.getForkName(executionPayloadBid.message.slot),
         data: executionPayloadBid,
