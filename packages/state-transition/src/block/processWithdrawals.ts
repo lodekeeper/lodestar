@@ -33,6 +33,8 @@ export function processWithdrawals(
 ): void {
   // Return early if the parent block is empty
   if (fork >= ForkSeq.gloas && !isParentBlockFull(state as CachedBeaconStateGloas)) {
+    // Clear expected withdrawals so envelope validation doesn't use stale data from a prior full block
+    (state as CachedBeaconStateGloas).payloadExpectedWithdrawals = ssz.capella.Withdrawals.toViewDU([]);
     return;
   }
 

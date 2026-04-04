@@ -19,6 +19,7 @@ import {
   IBeaconStateView,
   type IBeaconStateViewBellatrix,
   computeTimeAtSlot,
+  isParentBlockFull,
   isStatePostBellatrix,
   isStatePostCapella,
   isStatePostGloas,
@@ -771,9 +772,15 @@ function preparePayloadAttributes(
       throw new Error("Expected Capella state for withdrawals");
     }
 
-    // withdrawals logic is now fork aware as it changes on electra fork post capella
-    (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals =
-      prepareState.getExpectedWithdrawals().expectedWithdrawals;
+    // For Gloas, skip withdrawals when parent block is not full (EIP-7732)
+    // processWithdrawals returns early when parent is empty, so the EL should not include them
+    if (ForkSeq[fork] >= ForkSeq.gloas && isStatePostGloas(prepareState) && !isParentBlockFull(prepareState)) {
+      (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals = [];
+    } else {
+      // withdrawals logic is now fork aware as it changes on electra fork post capella
+      (payloadAttributes as capella.SSEPayloadAttributes["payloadAttributes"]).withdrawals =
+        prepareState.getExpectedWithdrawals().expectedWithdrawals;
+    }
   }
 
   if (ForkSeq[fork] >= ForkSeq.deneb) {

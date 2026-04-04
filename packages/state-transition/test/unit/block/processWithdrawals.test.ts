@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {ForkSeq} from "@lodestar/params";
-import {getExpectedWithdrawals} from "../../../src/block/processWithdrawals.js";
+import {ssz} from "@lodestar/types";
+import {getExpectedWithdrawals, processWithdrawals} from "../../../src/block/processWithdrawals.js";
 import {numValidators} from "../../../src/testUtils/util.js";
 import {beforeValue} from "../../utils/beforeValue.js";
 import {WithdrawalOpts, getExpectedWithdrawalsTestData} from "../../utils/capella.js";
@@ -44,4 +45,25 @@ describe("getExpectedWithdrawals", () => {
       expect(expectedWithdrawals.length).toBe(opts.withdrawals);
     });
   }
+});
+
+describe("processWithdrawals", () => {
+  it("clears payloadExpectedWithdrawals for gloas when the parent block is not full", () => {
+    const state = {
+      latestExecutionPayloadBid: {blockHash: new Uint8Array(32).fill(1)},
+      latestBlockHash: new Uint8Array(32).fill(2),
+      payloadExpectedWithdrawals: ssz.capella.Withdrawals.toViewDU([
+        {
+          index: 1,
+          validatorIndex: 2,
+          address: new Uint8Array(20).fill(3),
+          amount: 4n,
+        },
+      ]),
+    };
+
+    processWithdrawals(ForkSeq.gloas, state as unknown as Parameters<typeof processWithdrawals>[1]);
+
+    expect(state.payloadExpectedWithdrawals.length).toBe(0);
+  });
 });
