@@ -5,6 +5,7 @@ import {
   BUILDER_INDEX_SELF_BUILD,
   ForkPostBellatrix,
   ForkPostFulu,
+  ForkPostGloas,
   ForkPreGloas,
   NUMBER_OF_COLUMNS,
   SLOTS_PER_HISTORICAL_ROOT,
@@ -442,6 +443,31 @@ export function getBeaconBlockApi({
     }
   };
 
+  const getSignedExecutionPayloadEnvelope: ApplicationMethods<routes.beacon.block.Endpoints>["getSignedExecutionPayloadEnvelope"] =
+    async ({blockId}) => {
+      const {block, executionOptimistic, finalized} = await getBlockResponse(chain, blockId);
+      const slot = block.message.slot;
+      const fork = config.getForkName(slot);
+
+      if (!isForkPostGloas(fork)) {
+        throw new ApiError(404, "Execution payload envelope not found");
+      }
+
+      const blockRootHex = toRootHex(
+        sszTypesFor(fork).BeaconBlock.hashTreeRoot((block as SignedBeaconBlock<ForkPostGloas>).message)
+      );
+      const data = await chain.getSerializedExecutionPayloadEnvelope(slot, blockRootHex);
+
+      if (!data) {
+        throw new ApiError(404, "Execution payload envelope not found");
+      }
+
+      return {
+        data,
+        meta: {executionOptimistic, finalized, version: fork},
+      };
+    };
+
   return {
     async getBlockHeaders({slot, parentRoot}) {
       // TODO - SLOW CODE: This code seems like it could be improved
@@ -811,6 +837,8 @@ export function getBeaconBlockApi({
         sentPeers: (sentPeersArr[0] as number) ?? 0,
       });
     },
+
+    getSignedExecutionPayloadEnvelope,
 
     async getBlobSidecars({blockId, indices}) {
       assertUniqueItems(indices, "Duplicate indices provided");
