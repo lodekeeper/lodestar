@@ -3,13 +3,16 @@ import {fromHexString} from "@chainsafe/ssz";
 import {config} from "@lodestar/config/default";
 import {SLOTS_PER_EPOCH} from "@lodestar/params";
 import {DataAvailabilityStatus, computeEpochAtSlot} from "@lodestar/state-transition";
-import {RootHex, Slot} from "@lodestar/types";
+import {IndexedAttestation, RootHex, Slot, ssz} from "@lodestar/types";
 import {toHex} from "@lodestar/utils";
 import {
   EpochDifference,
   ExecutionStatus,
   ForkChoice,
+  ForkChoiceError,
+  ForkChoiceErrorCode,
   IForkChoiceStore,
+  InvalidAttestationCode,
   PayloadStatus,
   ProtoArray,
   ProtoBlock,
@@ -24,6 +27,7 @@ describe("Forkchoice", () => {
   const finalizedRoot = getBlockRoot(genesisSlot);
   const parentRoot = toHex(Buffer.alloc(32, 0xff));
   let protoArr: ProtoArray;
+  let fcStore: IForkChoiceStore;
   const validatorCount = 100;
 
   beforeEach(() => {
@@ -50,44 +54,43 @@ describe("Forkchoice", () => {
       } as Omit<ProtoBlock, "targetRoot">,
       genesisSlot
     );
+    fcStore = {
+      currentSlot: genesisSlot + 1,
+      justified: {
+        checkpoint: {
+          epoch: genesisEpoch,
+          root: fromHexString(finalizedRoot),
+          rootHex: finalizedRoot,
+          payloadStatus: PayloadStatus.FULL,
+        },
+        balances: new Uint16Array([32]),
+        totalBalance: 32,
+      },
+      unrealizedJustified: {
+        checkpoint: {
+          epoch: genesisEpoch,
+          root: fromHexString(finalizedRoot),
+          rootHex: finalizedRoot,
+          payloadStatus: PayloadStatus.FULL,
+        },
+        balances: new Uint16Array([32]),
+      },
+      finalizedCheckpoint: {
+        epoch: genesisEpoch,
+        root: fromHexString(finalizedRoot),
+        rootHex: finalizedRoot,
+        payloadStatus: PayloadStatus.FULL,
+      },
+      unrealizedFinalizedCheckpoint: {
+        epoch: genesisEpoch,
+        root: fromHexString(finalizedRoot),
+        rootHex: finalizedRoot,
+        payloadStatus: PayloadStatus.FULL,
+      },
+      justifiedBalancesGetter: () => new Uint16Array([32]),
+      equivocatingIndices: new Set(),
+    };
   });
-
-  const fcStore: IForkChoiceStore = {
-    currentSlot: genesisSlot + 1,
-    justified: {
-      checkpoint: {
-        epoch: genesisEpoch,
-        root: fromHexString(finalizedRoot),
-        rootHex: finalizedRoot,
-        payloadStatus: PayloadStatus.FULL,
-      },
-      balances: new Uint16Array([32]),
-      totalBalance: 32,
-    },
-    unrealizedJustified: {
-      checkpoint: {
-        epoch: genesisEpoch,
-        root: fromHexString(finalizedRoot),
-        rootHex: finalizedRoot,
-        payloadStatus: PayloadStatus.FULL,
-      },
-      balances: new Uint16Array([32]),
-    },
-    finalizedCheckpoint: {
-      epoch: genesisEpoch,
-      root: fromHexString(finalizedRoot),
-      rootHex: finalizedRoot,
-      payloadStatus: PayloadStatus.FULL,
-    },
-    unrealizedFinalizedCheckpoint: {
-      epoch: genesisEpoch,
-      root: fromHexString(finalizedRoot),
-      rootHex: finalizedRoot,
-      payloadStatus: PayloadStatus.FULL,
-    },
-    justifiedBalancesGetter: () => new Uint16Array([32]),
-    equivocatingIndices: new Set(),
-  };
 
   const getParentBlockRoot = (slot: number, skippedSlots: number[] = []): RootHex => {
     slot -= 1;
@@ -134,6 +137,70 @@ describe("Forkchoice", () => {
       parentBlockHash: null,
       payloadStatus: PayloadStatus.FULL,
     };
+  };
+
+  const getPayloadHash = (slot: number): RootHex => toHex(Buffer.alloc(32, slot + 1));
+
+  const getGloasBlock = (slot: number): ProtoBlock => {
+    const block = getBlock(slot);
+    return {
+      ...block,
+      executionPayloadBlockHash: getPayloadHash(slot),
+      executionPayloadNumber: slot,
+      executionStatus: ExecutionStatus.PayloadSeparated,
+      dataAvailabilityStatus: DataAvailabilityStatus.Available,
+      parentBlockHash: getPayloadHash(slot + 64),
+      payloadStatus: PayloadStatus.PENDING,
+    };
+  };
+
+  const getAttestationDataRoot = (attestation: IndexedAttestation): RootHex =>
+    toHex(ssz.phase0.AttestationData.hashTreeRoot(attestation.data));
+
+  const createAttestation = (block: ProtoBlock, slot: Slot, index: number, validatorIndex = 0): IndexedAttestation => ({
+    attestingIndices: [validatorIndex],
+    data: {
+      slot,
+      index,
+      beaconBlockRoot: fromHexString(block.blockRoot),
+      source: {
+        epoch: computeEpochAtSlot(slot),
+        root: fromHexString(block.targetRoot),
+      },
+      target: {
+        epoch: computeEpochAtSlot(slot),
+        root: fromHexString(block.targetRoot),
+      },
+    },
+    signature: Buffer.alloc(96),
+  });
+
+  const getVoteNextIndices = (forkchoice: ForkChoice): number[] =>
+    Reflect.get(forkchoice, "voteNextIndices") as number[];
+
+  const expectInvalidAttestation = (
+    action: () => void,
+    code: InvalidAttestationCode
+  ): Extract<ForkChoiceError["type"], {code: ForkChoiceErrorCode.INVALID_ATTESTATION}>["err"] => {
+    try {
+      action();
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(ForkChoiceError);
+      if (!(error instanceof ForkChoiceError)) {
+        throw error;
+      }
+
+      const {type} = error;
+      expect(type.code).toBe(ForkChoiceErrorCode.INVALID_ATTESTATION);
+      if (type.code !== ForkChoiceErrorCode.INVALID_ATTESTATION) {
+        throw error;
+      }
+
+      expect(type.err.code).toBe(code);
+      return type.err;
+    }
+
+    throw new Error(`Expected INVALID_ATTESTATION ${code}`);
   };
 
   const populateProtoArray = (tillSlot: number, skippedSlots: number[] = []): void => {
@@ -193,6 +260,156 @@ describe("Forkchoice", () => {
 
     expect(forkCombined.ancestors).toEqual(forkAncestorBlocks);
     expect(forkCombined.nonAncestors).toEqual(forkNonAncestorBlocks);
+  });
+
+  describe("Gloas attestation index validation", () => {
+    it("same-slot index=0 succeeds and maps to PENDING", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot, 0);
+
+      forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation));
+      forkchoice.updateTime(block.slot + 1);
+
+      const pendingIndex = protoArr.getNodeIndexByRootAndStatus(block.blockRoot, PayloadStatus.PENDING);
+      expect(pendingIndex).toBeDefined();
+      expect(getVoteNextIndices(forkchoice)[0]).toBe(pendingIndex);
+    });
+
+    it("same-slot index=1 throws INVALID_DATA_INDEX", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot, 1);
+
+      expectInvalidAttestation(
+        () => forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation)),
+        InvalidAttestationCode.INVALID_DATA_INDEX
+      );
+    });
+
+    it("later-slot index=1 without FULL variant throws UNKNOWN_PAYLOAD_STATUS", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot + 1;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot + 1, 1);
+
+      const err = expectInvalidAttestation(
+        () => forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation)),
+        InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS
+      );
+
+      if (!("beaconBlockRoot" in err)) {
+        throw new Error("Expected UNKNOWN_PAYLOAD_STATUS error payload");
+      }
+      expect(err.beaconBlockRoot).toBe(block.blockRoot);
+    });
+
+    it("later-slot index=1 with FULL variant succeeds and maps to FULL", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      protoArr.onExecutionPayload(
+        block.blockRoot,
+        block.slot + 1,
+        getPayloadHash(block.slot),
+        block.slot,
+        block.stateRoot,
+        null,
+        ExecutionStatus.Valid
+      );
+      fcStore.currentSlot = block.slot + 1;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot + 1, 1);
+
+      forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation));
+      forkchoice.updateTime(block.slot + 2);
+
+      const fullIndex = protoArr.getNodeIndexByRootAndStatus(block.blockRoot, PayloadStatus.FULL);
+      expect(fullIndex).toBeDefined();
+      expect(getVoteNextIndices(forkchoice)[0]).toBe(fullIndex);
+    });
+
+    it("same-slot index=1 still throws INVALID_DATA_INDEX when FULL variant is known", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      protoArr.onExecutionPayload(
+        block.blockRoot,
+        block.slot,
+        getPayloadHash(block.slot),
+        block.slot,
+        block.stateRoot,
+        null,
+        ExecutionStatus.Valid
+      );
+      fcStore.currentSlot = block.slot;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot, 1);
+
+      expectInvalidAttestation(
+        () => forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation)),
+        InvalidAttestationCode.INVALID_DATA_INDEX
+      );
+    });
+
+    it("later-slot index=1 succeeds after FULL variant arrives (retry)", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot + 1;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot + 1, 1);
+      const attDataRoot = getAttestationDataRoot(attestation);
+
+      // First attempt: FULL variant not known yet → UNKNOWN_PAYLOAD_STATUS
+      expectInvalidAttestation(
+        () => forkchoice.onAttestation(attestation, attDataRoot),
+        InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS
+      );
+
+      // Import FULL variant
+      protoArr.onExecutionPayload(
+        block.blockRoot,
+        block.slot + 1,
+        getPayloadHash(block.slot),
+        block.slot,
+        block.stateRoot,
+        null,
+        ExecutionStatus.Valid
+      );
+
+      // Second attempt with same attestation data → should succeed now
+      forkchoice.onAttestation(attestation, attDataRoot);
+      forkchoice.updateTime(block.slot + 2);
+
+      const fullIndex = protoArr.getNodeIndexByRootAndStatus(block.blockRoot, PayloadStatus.FULL);
+      expect(fullIndex).toBeDefined();
+      expect(getVoteNextIndices(forkchoice)[0]).toBe(fullIndex);
+    });
+
+    it("later-slot index=0 maps to EMPTY", () => {
+      const block = getGloasBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot + 1;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+      const attestation = createAttestation(block, block.slot + 1, 0);
+
+      forkchoice.onAttestation(attestation, getAttestationDataRoot(attestation));
+      forkchoice.updateTime(block.slot + 2);
+
+      const emptyIndex = protoArr.getNodeIndexByRootAndStatus(block.blockRoot, PayloadStatus.EMPTY);
+      expect(emptyIndex).toBeDefined();
+      expect(getVoteNextIndices(forkchoice)[0]).toBe(emptyIndex);
+    });
   });
 
   beforeAll(() => {
