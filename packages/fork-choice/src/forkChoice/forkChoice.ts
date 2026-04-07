@@ -1685,40 +1685,43 @@ export class ForkChoice implements IForkChoice {
       });
     }
 
-    // For Gloas blocks, attestation index must be 0 or 1
-    if (isGloasBlock(block) && attestationData.index !== 0 && attestationData.index !== 1) {
-      throw new ForkChoiceError({
-        code: ForkChoiceErrorCode.INVALID_ATTESTATION,
-        err: {
-          code: InvalidAttestationCode.INVALID_DATA_INDEX,
-          index: attestationData.index,
-        },
-      });
-    }
-
-    // Same-slot attestations must use index 0 — cannot vote FULL for same-slot block
-    // Spec: if block_slot == attestation.data.slot: assert attestation.data.index == 0
-    if (isGloasBlock(block) && block.slot === slot && attestationData.index !== 0) {
-      throw new ForkChoiceError({
-        code: ForkChoiceErrorCode.INVALID_ATTESTATION,
-        err: {
-          code: InvalidAttestationCode.INVALID_DATA_INDEX,
-          index: attestationData.index,
-        },
-      });
-    }
-
-    // If attesting for a full node, the payload must be known
-    if (isGloasBlock(block) && attestationData.index === 1) {
-      const fullNodeIndex = this.protoArray.getNodeIndexByRootAndStatus(beaconBlockRootHex, PayloadStatus.FULL);
-      if (fullNodeIndex === undefined) {
+    // Gloas-specific attestation index validation
+    if (isGloasBlock(block)) {
+      // Attestation index must be 0 (EMPTY) or 1 (FULL)
+      if (attestationData.index !== 0 && attestationData.index !== 1) {
         throw new ForkChoiceError({
           code: ForkChoiceErrorCode.INVALID_ATTESTATION,
           err: {
-            code: InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS,
-            beaconBlockRoot: beaconBlockRootHex,
+            code: InvalidAttestationCode.INVALID_DATA_INDEX,
+            index: attestationData.index,
           },
         });
+      }
+
+      // Same-slot attestations must use index 0 — cannot vote FULL for same-slot block
+      // Spec: if block_slot == attestation.data.slot: assert attestation.data.index == 0
+      if (block.slot === slot && attestationData.index !== 0) {
+        throw new ForkChoiceError({
+          code: ForkChoiceErrorCode.INVALID_ATTESTATION,
+          err: {
+            code: InvalidAttestationCode.INVALID_DATA_INDEX,
+            index: attestationData.index,
+          },
+        });
+      }
+
+      // If attesting for a full node, the payload must be known
+      if (attestationData.index === 1) {
+        const fullNodeIndex = this.protoArray.getNodeIndexByRootAndStatus(beaconBlockRootHex, PayloadStatus.FULL);
+        if (fullNodeIndex === undefined) {
+          throw new ForkChoiceError({
+            code: ForkChoiceErrorCode.INVALID_ATTESTATION,
+            err: {
+              code: InvalidAttestationCode.UNKNOWN_PAYLOAD_STATUS,
+              beaconBlockRoot: beaconBlockRootHex,
+            },
+          });
+        }
       }
     }
 
