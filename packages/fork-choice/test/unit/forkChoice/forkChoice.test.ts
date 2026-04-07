@@ -410,6 +410,22 @@ describe("Forkchoice", () => {
       expect(emptyIndex).toBeDefined();
       expect(getVoteNextIndices(forkchoice)[0]).toBe(emptyIndex);
     });
+
+    it("non-Gloas block attestation is unaffected by index validation", () => {
+      const block = getBlock(genesisSlot + 1);
+      protoArr.onBlock(block, block.slot, null);
+      fcStore.currentSlot = block.slot + 1;
+
+      const forkchoice = new ForkChoice(config, fcStore, protoArr, validatorCount, null);
+
+      // Non-Gloas blocks: index validation does not apply — both index=0 and index=1 are accepted
+      const attestation0 = createAttestation(block, block.slot + 1, 0, 0);
+      const attestation1 = createAttestation(block, block.slot + 1, 1, 1);
+
+      // Neither should throw
+      forkchoice.onAttestation(attestation0, getAttestationDataRoot(attestation0));
+      forkchoice.onAttestation(attestation1, getAttestationDataRoot(attestation1));
+    });
   });
 
   beforeAll(() => {
