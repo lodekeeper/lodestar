@@ -1,5 +1,4 @@
 import {
-  BitListType,
   ByteVectorType,
   ContainerType,
   ListBasicType,
@@ -67,33 +66,6 @@ export const DataColumnSidecar = new ContainerType(
 );
 
 export const DataColumnSidecars = new ListCompositeType(DataColumnSidecar, NUMBER_OF_COLUMNS);
-
-export const PartialDataColumnHeader = new ContainerType(
-  {
-    kzgCommitments: denebSsz.BlobKzgCommitments,
-    signedBlockHeader: phase0Ssz.SignedBeaconBlockHeader,
-    kzgCommitmentsInclusionProof: KzgCommitmentsInclusionProof,
-  },
-  {typeName: "PartialDataColumnHeader", jsonCase: "eth2"}
-);
-
-export const PartialDataColumnPartsMetadata = new ContainerType(
-  {
-    available: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
-    requests: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
-  },
-  {typeName: "PartialDataColumnPartsMetadata", jsonCase: "eth2"}
-);
-
-export const PartialDataColumnSidecar = new ContainerType(
-  {
-    cellsPresentBitmap: new BitListType(MAX_BLOB_COMMITMENTS_PER_BLOCK),
-    partialColumn: new ListCompositeType(Cell, MAX_BLOB_COMMITMENTS_PER_BLOCK),
-    kzgProofs: new ListCompositeType(denebSsz.KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK),
-    header: new ListCompositeType(PartialDataColumnHeader, 1),
-  },
-  {typeName: "PartialDataColumnSidecar", jsonCase: "eth2"}
-);
 
 export const MatrixEntry = new ContainerType(
   {

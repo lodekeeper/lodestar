@@ -74,6 +74,9 @@ export const defaultSkipOpts: SkipOpts = {
     /^.+\/light_client\/data_collection\/.*/,
     /^gloas\/fork_choice\/.*$/,
     /^gloas\/ssz_static\/ForkChoiceNode.*$/,
+    // Ignore the partial data column container additions for now; they are outside the alpha.4/#4979 runtime scope.
+    /^fulu\/ssz_static\/PartialDataColumn(Header|PartsMetadata|Sidecar)\/.*$/,
+    /^gloas\/ssz_static\/PartialDataColumn(Header|PartsMetadata|Sidecar)\/.*$/,
   ],
   skippedTests: [],
   skippedRunners: [],

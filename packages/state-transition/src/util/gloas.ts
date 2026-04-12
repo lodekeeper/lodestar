@@ -178,29 +178,15 @@ export function isParentBlockFull(state: CachedBeaconStateGloas | IBeaconStateVi
   return byteArrayEquals(state.latestExecutionPayloadBid.blockHash, state.latestBlockHash);
 }
 
-function toUint32ArrayCommittee(committee: ArrayLike<ValidatorIndex>): Uint32Array {
-  return Uint32Array.from(committee as ArrayLike<number>);
-}
-
-function getPtcWindowShuffling(state: CachedBeaconStateFulu, epoch: Epoch) {
-  const shuffling = state.epochCtx.getShufflingAtEpochOrNull(epoch);
-  if (shuffling) {
-    return shuffling;
-  }
-
-  const activeValidatorIndices =
-    epoch === state.epochCtx.nextEpoch ? state.epochCtx.nextActiveIndices : getActiveValidatorIndices(state, epoch);
-
-  return computeEpochShuffling(state, activeValidatorIndices, epoch);
-}
-
 export function initializePtcWindow(state: CachedBeaconStateFulu): number[][] {
   const ptcWindow = Array.from({length: SLOTS_PER_EPOCH}, () => Array.from(new Uint32Array(PTC_SIZE)));
   const currentEpoch = state.epochCtx.epoch;
 
   for (let epochOffset = 0; epochOffset <= MIN_SEED_LOOKAHEAD; epochOffset++) {
     const epoch = currentEpoch + epochOffset;
-    const shuffling = getPtcWindowShuffling(state, epoch);
+    const shuffling =
+      state.epochCtx.getShufflingAtEpochOrNull(epoch) ??
+      computeEpochShuffling(state, getActiveValidatorIndices(state, epoch), epoch);
 
     ptcWindow.push(
       ...computePayloadTimelinessCommitteesForEpoch(
@@ -238,15 +224,19 @@ export function processPtcWindow(state: CachedBeaconStateGloas, cache: EpochTran
 export function getPtcWindowEpochCacheData(state: CachedBeaconStateGloas): {
   previousPayloadTimelinessCommittees: Uint32Array[];
   payloadTimelinessCommittees: Uint32Array[];
+  nextPayloadTimelinessCommittees: Uint32Array[];
 } {
   const ptcWindow = state.ptcWindow.toValue();
 
   return {
     previousPayloadTimelinessCommittees: ptcWindow
       .slice(0, SLOTS_PER_EPOCH)
-      .map((committee: ValidatorIndex[]) => toUint32ArrayCommittee(committee)),
+      .map((committee: ValidatorIndex[]) => Uint32Array.from(committee)),
     payloadTimelinessCommittees: ptcWindow
       .slice(SLOTS_PER_EPOCH, 2 * SLOTS_PER_EPOCH)
-      .map((committee: ValidatorIndex[]) => toUint32ArrayCommittee(committee)),
+      .map((committee: ValidatorIndex[]) => Uint32Array.from(committee)),
+    nextPayloadTimelinessCommittees: ptcWindow
+      .slice(2 * SLOTS_PER_EPOCH, 3 * SLOTS_PER_EPOCH)
+      .map((committee: ValidatorIndex[]) => Uint32Array.from(committee)),
   };
 }

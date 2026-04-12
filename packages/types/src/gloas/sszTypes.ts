@@ -80,33 +80,6 @@ export const PtcWindow = new VectorCompositeType(
   (2 + MIN_SEED_LOOKAHEAD) * SLOTS_PER_EPOCH
 );
 
-export const PartialDataColumnHeader = new ContainerType(
-  {
-    kzgCommitments: denebSsz.BlobKzgCommitments,
-    slot: Slot,
-    beaconBlockRoot: Root,
-  },
-  {typeName: "PartialDataColumnHeader", jsonCase: "eth2"}
-);
-
-export const PartialDataColumnPartsMetadata = new ContainerType(
-  {
-    available: fuluSsz.PartialDataColumnPartsMetadata.fields.available,
-    requests: fuluSsz.PartialDataColumnPartsMetadata.fields.requests,
-  },
-  {typeName: "PartialDataColumnPartsMetadata", jsonCase: "eth2"}
-);
-
-export const PartialDataColumnSidecar = new ContainerType(
-  {
-    cellsPresentBitmap: fuluSsz.PartialDataColumnSidecar.fields.cellsPresentBitmap,
-    partialColumn: fuluSsz.PartialDataColumnSidecar.fields.partialColumn,
-    kzgProofs: fuluSsz.PartialDataColumnSidecar.fields.kzgProofs,
-    header: new ListCompositeType(PartialDataColumnHeader, 1),
-  },
-  {typeName: "PartialDataColumnSidecar", jsonCase: "eth2"}
-);
-
 export const PayloadAttestationData = new ContainerType(
   {
     beaconBlockRoot: Root,
