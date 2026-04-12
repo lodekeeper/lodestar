@@ -6,16 +6,22 @@ import {
   EFFECTIVE_BALANCE_INCREMENT,
   FAR_FUTURE_EPOCH,
   MIN_DEPOSIT_AMOUNT,
+  MIN_SEED_LOOKAHEAD,
+  PTC_SIZE,
   SLOTS_PER_EPOCH,
 } from "@lodestar/params";
-import {BuilderIndex, Epoch, ValidatorIndex, gloas} from "@lodestar/types";
+import {BuilderIndex, Epoch, ValidatorIndex, gloas, ssz} from "@lodestar/types";
 import {AttestationData} from "@lodestar/types/phase0";
 import {byteArrayEquals} from "@lodestar/utils";
-import {IBeaconStateViewGloas} from "../stateView/interface.js";
-import {CachedBeaconStateGloas} from "../types.js";
+import type {EpochTransitionCache} from "../cache/epochTransitionCache.js";
+import type {CachedBeaconStateFulu, CachedBeaconStateGloas} from "../cache/stateCache.js";
+import type {IBeaconStateViewGloas} from "../stateView/interface.js";
 import {getBlockRootAtSlot} from "./blockRoot.js";
 import {computeEpochAtSlot} from "./epoch.js";
+import {computeEpochShuffling} from "./epochShuffling.js";
 import {RootCache} from "./rootCache.js";
+import {computePayloadTimelinessCommitteesForEpoch} from "./seed.js";
+import {getActiveValidatorIndices} from "./validator.js";
 
 export function isBuilderWithdrawalCredential(withdrawalCredentials: Uint8Array): boolean {
   return withdrawalCredentials[0] === BUILDER_WITHDRAWAL_PREFIX;
@@ -170,4 +176,77 @@ export function isAttestationSameSlotRootCache(rootCache: RootCache, data: Attes
 
 export function isParentBlockFull(state: CachedBeaconStateGloas | IBeaconStateViewGloas): boolean {
   return byteArrayEquals(state.latestExecutionPayloadBid.blockHash, state.latestBlockHash);
+}
+
+function toUint32ArrayCommittee(committee: ArrayLike<ValidatorIndex>): Uint32Array {
+  return Uint32Array.from(committee as ArrayLike<number>);
+}
+
+function getPtcWindowShuffling(state: CachedBeaconStateFulu, epoch: Epoch) {
+  const shuffling = state.epochCtx.getShufflingAtEpochOrNull(epoch);
+  if (shuffling) {
+    return shuffling;
+  }
+
+  const activeValidatorIndices =
+    epoch === state.epochCtx.nextEpoch ? state.epochCtx.nextActiveIndices : getActiveValidatorIndices(state, epoch);
+
+  return computeEpochShuffling(state, activeValidatorIndices, epoch);
+}
+
+export function initializePtcWindow(state: CachedBeaconStateFulu): number[][] {
+  const ptcWindow = Array.from({length: SLOTS_PER_EPOCH}, () => Array.from(new Uint32Array(PTC_SIZE)));
+  const currentEpoch = state.epochCtx.epoch;
+
+  for (let epochOffset = 0; epochOffset <= MIN_SEED_LOOKAHEAD; epochOffset++) {
+    const epoch = currentEpoch + epochOffset;
+    const shuffling = getPtcWindowShuffling(state, epoch);
+
+    ptcWindow.push(
+      ...computePayloadTimelinessCommitteesForEpoch(
+        state,
+        epoch,
+        shuffling.committees,
+        state.epochCtx.effectiveBalanceIncrements
+      ).map((committee) => Array.from(committee))
+    );
+  }
+
+  return ptcWindow;
+}
+
+export function processPtcWindow(state: CachedBeaconStateGloas, cache: EpochTransitionCache): void {
+  const nextEpoch = state.epochCtx.epoch + MIN_SEED_LOOKAHEAD + 1;
+  const nextShuffling =
+    cache.nextShuffling ?? computeEpochShuffling(state, cache.nextShufflingActiveIndices, nextEpoch);
+  cache.nextShuffling = nextShuffling;
+
+  const remainingPtcWindow = state.ptcWindow.toValue().slice(SLOTS_PER_EPOCH);
+  const nextEpochPtcs = computePayloadTimelinessCommitteesForEpoch(
+    state,
+    nextEpoch,
+    nextShuffling.committees,
+    state.epochCtx.effectiveBalanceIncrements
+  );
+
+  state.ptcWindow = ssz.gloas.PtcWindow.toViewDU([
+    ...remainingPtcWindow,
+    ...nextEpochPtcs.map((committee) => Array.from(committee)),
+  ]);
+}
+
+export function getPtcWindowEpochCacheData(state: CachedBeaconStateGloas): {
+  previousPayloadTimelinessCommittees: Uint32Array[];
+  payloadTimelinessCommittees: Uint32Array[];
+} {
+  const ptcWindow = state.ptcWindow.toValue();
+
+  return {
+    previousPayloadTimelinessCommittees: ptcWindow
+      .slice(0, SLOTS_PER_EPOCH)
+      .map((committee: ValidatorIndex[]) => toUint32ArrayCommittee(committee)),
+    payloadTimelinessCommittees: ptcWindow
+      .slice(SLOTS_PER_EPOCH, 2 * SLOTS_PER_EPOCH)
+      .map((committee: ValidatorIndex[]) => toUint32ArrayCommittee(committee)),
+  };
 }

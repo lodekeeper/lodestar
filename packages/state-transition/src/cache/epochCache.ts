@@ -32,10 +32,10 @@ import {
   calculateShufflingDecisionRoot,
   computeEpochShuffling,
 } from "../util/epochShuffling.js";
+import {getPtcWindowEpochCacheData} from "../util/gloas.js";
 import {
   computeActivationExitEpoch,
   computeEpochAtSlot,
-  computePayloadTimelinessCommitteesForEpoch,
   computeProposers,
   computeSyncPeriodAtEpoch,
   getActivationChurnLimit,
@@ -56,7 +56,7 @@ import {sumTargetUnslashedBalanceIncrements} from "../util/targetUnslashedBalanc
 import {EffectiveBalanceIncrements, getEffectiveBalanceIncrementsWithLen} from "./effectiveBalanceIncrements.js";
 import {EpochTransitionCache} from "./epochTransitionCache.js";
 import {PubkeyCache, createPubkeyCache, syncPubkeys} from "./pubkeyCache.js";
-import {CachedBeaconStateAllForks, CachedBeaconStateFulu} from "./stateCache.js";
+import {CachedBeaconStateAllForks, CachedBeaconStateFulu, CachedBeaconStateGloas} from "./stateCache.js";
 import {
   SyncCommitteeCache,
   SyncCommitteeCacheEmpty,
@@ -451,25 +451,13 @@ export class EpochCache {
       nextSyncCommitteeIndexed = new SyncCommitteeCacheEmpty();
     }
 
-    // Compute PTC for all slots in the prev/current epoch
+    // Copy previous/current epoch PTC slices from state.ptcWindow once, then serve hot-path lookups from epochCtx.
     let previousPayloadTimelinessCommittees: Uint32Array[] = [];
     let payloadTimelinessCommittees: Uint32Array[] = [];
     if (currentEpoch >= config.GLOAS_FORK_EPOCH) {
-      payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-        state,
-        currentEpoch,
-        currentShuffling.committees,
-        effectiveBalanceIncrements
-      );
-
-      if (!isGenesis && previousEpoch >= config.GLOAS_FORK_EPOCH) {
-        previousPayloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-          state,
-          previousEpoch,
-          previousShuffling.committees,
-          effectiveBalanceIncrements
-        );
-      }
+      ({previousPayloadTimelinessCommittees, payloadTimelinessCommittees} = getPtcWindowEpochCacheData(
+        state as CachedBeaconStateGloas
+      ));
     }
 
     // Precompute churnLimit for efficient initiateValidatorExit() during block proposing MUST be recompute everytime the
@@ -702,14 +690,12 @@ export class EpochCache {
 
     this.proposersPrevEpoch = this.proposers;
     if (upcomingEpoch >= this.config.GLOAS_FORK_EPOCH) {
-      // Shift and compute current epoch PTC eagerly for all slots
-      this.previousPayloadTimelinessCommittees = this.payloadTimelinessCommittees;
-      this.payloadTimelinessCommittees = computePayloadTimelinessCommitteesForEpoch(
-        state,
-        upcomingEpoch,
-        this.currentShuffling.committees,
-        this.effectiveBalanceIncrements
-      );
+      // processPtcWindow() already rotated the canonical state field earlier in process_epoch.
+      // Copy the previous/current epoch slices into epochCtx so validation stays on cached arrays.
+      ({
+        previousPayloadTimelinessCommittees: this.previousPayloadTimelinessCommittees,
+        payloadTimelinessCommittees: this.payloadTimelinessCommittees,
+      } = getPtcWindowEpochCacheData(state as CachedBeaconStateGloas));
     }
     if (upcomingEpoch >= this.config.FULU_FORK_EPOCH) {
       // Populate proposer cache with lookahead from state

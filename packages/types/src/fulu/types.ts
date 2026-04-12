@@ -12,6 +12,9 @@ export type DataColumn = ValueOf<typeof ssz.DataColumn>;
 export type ExtendedMatrix = ValueOf<typeof ssz.ExtendedMatrix>;
 export type KzgCommitmentsInclusionProof = ValueOf<typeof ssz.KzgCommitmentsInclusionProof>;
 export type DataColumnSidecar = ValueOf<typeof ssz.DataColumnSidecar>;
+export type PartialDataColumnHeader = ValueOf<typeof ssz.PartialDataColumnHeader>;
+export type PartialDataColumnPartsMetadata = ValueOf<typeof ssz.PartialDataColumnPartsMetadata>;
+export type PartialDataColumnSidecar = ValueOf<typeof ssz.PartialDataColumnSidecar>;
 export type DataColumnSidecars = ValueOf<typeof ssz.DataColumnSidecars>;
 export type MatrixEntry = ValueOf<typeof ssz.MatrixEntry>;
 
