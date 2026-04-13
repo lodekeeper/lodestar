@@ -215,6 +215,8 @@ export function processPtcWindow(state: CachedBeaconStateGloas, cache: EpochTran
     state.epochCtx.effectiveBalanceIncrements
   );
 
+  cache.nextPayloadTimelinessCommittees = nextEpochPtcs;
+
   state.ptcWindow = ssz.gloas.PtcWindow.toViewDU([
     ...remainingPtcWindow,
     ...nextEpochPtcs.map((committee) => Array.from(committee)),

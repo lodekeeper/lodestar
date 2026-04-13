@@ -159,6 +159,12 @@ export interface EpochTransitionCache {
   nextShuffling: EpochShuffling | null;
 
   /**
+   * Pre-computed PTCs for epoch N+2, populated by processPtcWindow (Gloas+).
+   * Used by finalProcessEpoch to rotate the cached committee windows without re-reading state.ptcWindow.
+   */
+  nextPayloadTimelinessCommittees: Uint32Array[] | null;
+
+  /**
    * Altair specific, this is total active balances for the next epoch.
    * This is only used in `afterProcessEpoch` to compute base reward and sync participant reward.
    * It's not efficient to calculate it at that time since it requires looping through all active validators,
@@ -502,6 +508,7 @@ export function beforeProcessEpoch(
     indicesToEject,
     nextShufflingActiveIndices,
     nextShuffling: null,
+    nextPayloadTimelinessCommittees: null,
     // to be updated in processEffectiveBalanceUpdates
     nextEpochTotalActiveBalanceByIncrement: 0,
     isActivePrevEpoch,

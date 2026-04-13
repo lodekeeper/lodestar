@@ -688,20 +688,28 @@ export class EpochCache {
   /**
    * At fork boundary, this runs post-fork logic and it happens after `upgradeState*` is called.
    */
-  finalProcessEpoch(state: CachedBeaconStateAllForks): void {
+  finalProcessEpoch(state: CachedBeaconStateAllForks, epochTransitionCache: EpochTransitionCache): void {
     // this.epoch was updated at the end of afterProcessEpoch()
     const upcomingEpoch = this.epoch;
     const epochAfterUpcoming = upcomingEpoch + 1;
 
     this.proposersPrevEpoch = this.proposers;
     if (upcomingEpoch >= this.config.GLOAS_FORK_EPOCH) {
-      // processPtcWindow() already rotated the canonical state field earlier in process_epoch.
-      // Copy the previous/current epoch slices into epochCtx so validation stays on cached arrays.
-      ({
-        previousPayloadTimelinessCommittees: this.previousPayloadTimelinessCommittees,
-        payloadTimelinessCommittees: this.payloadTimelinessCommittees,
-        nextPayloadTimelinessCommittees: this.nextPayloadTimelinessCommittees,
-      } = getPtcWindowEpochCacheData(state as CachedBeaconStateGloas));
+      if (
+        this.payloadTimelinessCommittees.length > 0 &&
+        epochTransitionCache.nextPayloadTimelinessCommittees !== null
+      ) {
+        this.previousPayloadTimelinessCommittees = this.payloadTimelinessCommittees;
+        this.payloadTimelinessCommittees = this.nextPayloadTimelinessCommittees;
+        this.nextPayloadTimelinessCommittees = epochTransitionCache.nextPayloadTimelinessCommittees;
+      } else {
+        // First Gloas boundary (or defensive fallback): hydrate from canonical state once.
+        ({
+          previousPayloadTimelinessCommittees: this.previousPayloadTimelinessCommittees,
+          payloadTimelinessCommittees: this.payloadTimelinessCommittees,
+          nextPayloadTimelinessCommittees: this.nextPayloadTimelinessCommittees,
+        } = getPtcWindowEpochCacheData(state as CachedBeaconStateGloas));
+      }
     }
     if (upcomingEpoch >= this.config.FULU_FORK_EPOCH) {
       // Populate proposer cache with lookahead from state
