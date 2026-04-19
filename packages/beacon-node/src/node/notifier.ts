@@ -127,8 +127,9 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
         logger.info(`New sync committee period ${period}`);
       }
 
-      // Log halfway through each slot
-      await sleep(timeToNextHalfSlot(config, chain, isFirstTime), signal);
+      // Log once per slot, after the slot's main events have settled
+      // (halfway for pre-Gloas, 5/6 for Gloas to let PTC votes land — spec PR #4884)
+      await sleep(timeToNextLogPoint(config, chain, isFirstTime), signal);
       isFirstTime = false;
     }
   } catch (e) {
@@ -139,9 +140,8 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
   }
 }
 
-function timeToNextHalfSlot(config: BeaconConfig, chain: IBeaconChain, isFirstTime: boolean): number {
+function timeToNextLogPoint(config: BeaconConfig, chain: IBeaconChain, isFirstTime: boolean): number {
   const msPerSlot = config.SLOT_DURATION_MS;
-  const msPerHalfSlot = msPerSlot / 2;
   const msFromGenesis = Date.now() - chain.genesisTime * 1000;
   const msToNextSlot =
     msFromGenesis < 0
@@ -149,12 +149,21 @@ function timeToNextHalfSlot(config: BeaconConfig, chain: IBeaconChain, isFirstTi
         -msFromGenesis % msPerSlot
       : // For past genesis time, calculate time until the next slot
         msPerSlot - (msFromGenesis % msPerSlot);
+
+  // In Gloas, PTC votes decide payload timeliness around 2/3 of the slot; log at 5/6 so the
+  // head has transitioned from PENDING to FULL/EMPTY. Pre-Gloas keeps the half-slot cadence.
+  const currentSlot = chain.clock.currentSlot;
+  const msSlotOffset = isForkPostGloas(config.getForkName(currentSlot)) ? (msPerSlot * 5) / 6 : msPerSlot / 2;
+
   if (isFirstTime) {
-    // at the 1st time we may miss middle of the current clock slot
-    return msToNextSlot > msPerHalfSlot ? msToNextSlot - msPerHalfSlot : msToNextSlot + msPerHalfSlot;
+    // at the 1st time we may miss the log point of the current clock slot
+    const msToSlotEndFromLogPoint = msPerSlot - msSlotOffset;
+    return msToNextSlot > msToSlotEndFromLogPoint
+      ? msToNextSlot - msToSlotEndFromLogPoint
+      : msToNextSlot + msSlotOffset;
   }
-  // after the 1st time always wait until middle of next clock slot
-  return msToNextSlot + msPerHalfSlot;
+  // after the 1st time always wait until the log point of the next clock slot
+  return msToNextSlot + msSlotOffset;
 }
 
 function getHeadExecutionInfo(
