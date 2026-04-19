@@ -19,6 +19,11 @@ import {TimeSeries} from "../util/timeSeries.js";
 /** Create a warning log whenever the peer count is at or below this value */
 const WARN_PEER_COUNT = 1;
 
+/** Notifier log point as basis points of the slot: 5000 BPS = half-slot (pre-Gloas). */
+const NOTIFIER_LOG_DUE_BPS = 5000;
+/** Notifier log point for Gloas: 8333 BPS ≈ 5/6 of slot — past PTC deadline so the head has transitioned from PENDING to FULL/EMPTY. */
+const NOTIFIER_LOG_DUE_BPS_GLOAS = 8333;
+
 type NodeNotifierModules = {
   network: INetwork;
   chain: IBeaconChain;
@@ -153,7 +158,10 @@ function timeToNextLogPoint(config: BeaconConfig, chain: IBeaconChain, isFirstTi
   // In Gloas, PTC votes decide payload timeliness around 2/3 of the slot; log at 5/6 so the
   // head has transitioned from PENDING to FULL/EMPTY. Pre-Gloas keeps the half-slot cadence.
   const currentSlot = chain.clock.currentSlot;
-  const msSlotOffset = isForkPostGloas(config.getForkName(currentSlot)) ? (msPerSlot * 5) / 6 : msPerSlot / 2;
+  const logDueBps = isForkPostGloas(config.getForkName(currentSlot))
+    ? NOTIFIER_LOG_DUE_BPS_GLOAS
+    : NOTIFIER_LOG_DUE_BPS;
+  const msSlotOffset = config.getSlotComponentDurationMs(logDueBps);
 
   if (isFirstTime) {
     // at the 1st time we may miss the log point of the current clock slot
