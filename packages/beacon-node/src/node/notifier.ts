@@ -168,20 +168,22 @@ function getHeadExecutionInfo(
     return [];
   }
 
-  // Base label preserves the pre-Gloas EL validation signal (valid/syncing). For Gloas
-  // non-FULL heads (PayloadSeparated), the exec-block shown is the parent's imported
-  // anchor, which is always validated by the time we log, so render as "valid".
-  let executionStatusStr =
+  // Label preserves the pre-Gloas EL validation signal (valid/syncing). For Gloas non-FULL
+  // heads (PayloadSeparated), the exec-block shown is the parent's imported anchor, which is
+  // always validated by the time we log, so render as "valid".
+  const executionStatusStr =
     headInfo.executionStatus === ExecutionStatus.PayloadSeparated ? "valid" : headInfo.executionStatus.toLowerCase();
 
   // Gloas heads carry head.parentBlockHash (the bid's parent_block_hash). Look up the exact
-  // parent variant this head built on; if it was EMPTY, suffix the label. Two consecutive
-  // logs with the same hash and "/empty" signal a string of missed payloads, since a block
-  // extending an EMPTY parent inherits the grandparent's anchor as its bid.parent_block_hash.
+  // parent variant this head built on; if it was EMPTY, append "empty-parent" after the tuple.
+  // Two consecutive logs with the same hash and "empty-parent" signal a string of missed
+  // payloads, since a block extending an EMPTY parent inherits the grandparent's anchor as its
+  // bid.parent_block_hash.
+  let emptyParentSuffix = "";
   if (headInfo.parentBlockHash !== null) {
     const parentVariant = forkChoice.getBlockHexAndBlockHash(headInfo.parentRoot, headInfo.parentBlockHash);
     if (parentVariant?.payloadStatus === PayloadStatus.EMPTY) {
-      executionStatusStr = `${executionStatusStr}/empty`;
+      emptyParentSuffix = " empty-parent";
     }
   }
 
@@ -195,10 +197,10 @@ function getHeadExecutionInfo(
       return [
         `exec-block: ${executionStatusStr}(${executionPayloadNumberInfo} ${prettyBytesShort(
           executionPayloadHashInfo
-        )})`,
+        )})${emptyParentSuffix}`,
       ];
     }
-    return [`exec-block: ${executionStatusStr}`];
+    return [`exec-block: ${executionStatusStr}${emptyParentSuffix}`];
   }
 
   return [];
