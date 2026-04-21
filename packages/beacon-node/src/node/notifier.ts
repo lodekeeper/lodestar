@@ -1,5 +1,5 @@
 import {BeaconConfig} from "@lodestar/config";
-import {ExecutionStatus, ProtoBlock} from "@lodestar/fork-choice";
+import {ExecutionStatus, IForkChoice, PayloadStatus, ProtoBlock} from "@lodestar/fork-choice";
 import {EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH} from "@lodestar/params";
 import {
   IBeaconStateView,
@@ -7,7 +7,7 @@ import {
   computeStartSlotAtEpoch,
   isStatePostBellatrix,
 } from "@lodestar/state-transition";
-import {Epoch} from "@lodestar/types";
+import {Epoch, RootHex} from "@lodestar/types";
 import {ErrorAborted, Logger, prettyBytes, prettyBytesShort, sleep} from "@lodestar/utils";
 import {IBeaconChain} from "../chain/index.js";
 import {ExecutionEngineState} from "../execution/index.js";
@@ -83,6 +83,7 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
       const headRow = `head: ${headDiffInfo}${prettyBytes(headInfo.blockRoot)}`;
 
       const executionInfo = getHeadExecutionInfo(config, clockEpoch, headState, headInfo);
+      const prevPayloadInfo = getPrevSlotPayloadInfo(chain.forkChoice, headInfo, clockEpoch, config);
       const finalizedCheckpointRow = `finalized: ${prettyBytes(finalizedRoot)}:${finalizedEpoch}`;
 
       let nodeState: string[];
@@ -101,6 +102,7 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
             clockSlotRow,
             headRow,
             ...executionInfo,
+            ...prevPayloadInfo,
             finalizedCheckpointRow,
             peersRow,
           ];
@@ -109,13 +111,29 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
 
         case SyncState.Synced: {
           // Synced - clock - head - finalized - peers
-          nodeState = ["Synced", clockSlotRow, headRow, ...executionInfo, finalizedCheckpointRow, peersRow];
+          nodeState = [
+            "Synced",
+            clockSlotRow,
+            headRow,
+            ...executionInfo,
+            ...prevPayloadInfo,
+            finalizedCheckpointRow,
+            peersRow,
+          ];
           break;
         }
 
         case SyncState.Stalled: {
           // Searching peers - peers - head - finalized - clock
-          nodeState = ["Searching peers", peersRow, clockSlotRow, headRow, ...executionInfo, finalizedCheckpointRow];
+          nodeState = [
+            "Searching peers",
+            peersRow,
+            clockSlotRow,
+            headRow,
+            ...executionInfo,
+            ...prevPayloadInfo,
+            finalizedCheckpointRow,
+          ];
         }
       }
       logger.info(nodeState.join(" - "));
@@ -186,4 +204,59 @@ function getHeadExecutionInfo(
   }
 
   return [];
+}
+
+/**
+ * Returns the resolved parent of the current head — the "previous slot" from the perspective of
+ * the next block builder, which will reference this block via its beacon-block parent hash.
+ *
+ * For Gloas blocks with multiple variants, prefer FULL (payload revealed) over EMPTY (payload missed).
+ */
+function getResolvedParentBlock(forkChoice: IForkChoice, parentRoot: RootHex): ProtoBlock | null {
+  const full = forkChoice.getBlockHex(parentRoot, PayloadStatus.FULL);
+  if (full !== null) return full;
+  // Gloas block with missed payload
+  const empty = forkChoice.getBlockHex(parentRoot, PayloadStatus.EMPTY);
+  if (empty !== null) return empty;
+  // Should be rare (parent of head usually resolved); fall through to default variant
+  return forkChoice.getBlockHexDefaultStatus(parentRoot);
+}
+
+/**
+ * Returns the execution payload status of the block the next proposer would build on top of —
+ * i.e., the parent of the current head. Surfaces what payload will be referenced as
+ * `parent_beacon_block_root`/`parent_hash` by the next payload.
+ *
+ * Pre-Gloas: parent's `payloadStatus` is always FULL (single variant).
+ * Gloas: parent may be FULL (payload revealed) or EMPTY (PTC voted not-present).
+ */
+function getPrevSlotPayloadInfo(
+  forkChoice: IForkChoice,
+  headInfo: ProtoBlock,
+  clockEpoch: Epoch,
+  config: BeaconConfig
+): string[] {
+  if (clockEpoch < config.BELLATRIX_FORK_EPOCH) {
+    return [];
+  }
+
+  const parent = getResolvedParentBlock(forkChoice, headInfo.parentRoot);
+  if (parent === null || parent.executionStatus === ExecutionStatus.PreMerge) {
+    return [];
+  }
+
+  const payloadStatusStr =
+    parent.payloadStatus === PayloadStatus.FULL
+      ? "full"
+      : parent.payloadStatus === PayloadStatus.EMPTY
+        ? "empty"
+        : "pending";
+
+  if (parent.payloadStatus === PayloadStatus.FULL && parent.executionPayloadBlockHash !== null) {
+    const hashInfo = prettyBytesShort(parent.executionPayloadBlockHash);
+    const numberInfo = parent.executionPayloadNumber;
+    return [`prev-payload: ${payloadStatusStr}(${numberInfo} ${hashInfo})`];
+  }
+
+  return [`prev-payload: ${payloadStatusStr}`];
 }
