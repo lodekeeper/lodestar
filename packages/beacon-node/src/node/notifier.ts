@@ -168,16 +168,21 @@ function getHeadExecutionInfo(
     return [];
   }
 
-  // For Gloas heads, render the status as the parent's payload status: "full" when the parent
-  // payload was revealed, "empty" when it was missed. head.parentBlockHash is the bid's
-  // parent_block_hash, which identifies the exact parent variant this block built on. Two
-  // consecutive logs with the same hash and "empty" label signal a string of missed payloads.
-  let executionStatusStr: string;
+  // Base label preserves the pre-Gloas EL validation signal (valid/syncing). For Gloas
+  // non-FULL heads (PayloadSeparated), the exec-block shown is the parent's imported
+  // anchor, which is always validated by the time we log, so render as "valid".
+  let executionStatusStr =
+    headInfo.executionStatus === ExecutionStatus.PayloadSeparated ? "valid" : headInfo.executionStatus.toLowerCase();
+
+  // Gloas heads carry head.parentBlockHash (the bid's parent_block_hash). Look up the exact
+  // parent variant this head built on; if it was EMPTY, suffix the label. Two consecutive
+  // logs with the same hash and "/empty" signal a string of missed payloads, since a block
+  // extending an EMPTY parent inherits the grandparent's anchor as its bid.parent_block_hash.
   if (headInfo.parentBlockHash !== null) {
     const parentVariant = forkChoice.getBlockHexAndBlockHash(headInfo.parentRoot, headInfo.parentBlockHash);
-    executionStatusStr = parentVariant?.payloadStatus === PayloadStatus.EMPTY ? "empty" : "full";
-  } else {
-    executionStatusStr = headInfo.executionStatus.toLowerCase();
+    if (parentVariant?.payloadStatus === PayloadStatus.EMPTY) {
+      executionStatusStr = `${executionStatusStr}/empty`;
+    }
   }
 
   // Add execution status to notifier only if head is on/post bellatrix
