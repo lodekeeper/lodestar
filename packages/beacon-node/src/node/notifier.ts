@@ -1,5 +1,5 @@
 import {BeaconConfig} from "@lodestar/config";
-import {ExecutionStatus, ProtoBlock} from "@lodestar/fork-choice";
+import {ExecutionStatus, IForkChoice, PayloadStatus, ProtoBlock} from "@lodestar/fork-choice";
 import {EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH} from "@lodestar/params";
 import {
   IBeaconStateView,
@@ -82,7 +82,7 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
         skippedSlots > 0 ? (skippedSlots > 1000 ? `${headInfo.slot} ` : `(slot -${skippedSlots}) `) : "";
       const headRow = `head: ${headDiffInfo}${prettyBytes(headInfo.blockRoot)}`;
 
-      const executionInfo = getHeadExecutionInfo(config, clockEpoch, headState, headInfo);
+      const executionInfo = getHeadExecutionInfo(chain.forkChoice, config, clockEpoch, headState, headInfo);
       const finalizedCheckpointRow = `finalized: ${prettyBytes(finalizedRoot)}:${finalizedEpoch}`;
 
       let nodeState: string[];
@@ -158,6 +158,7 @@ function timeToNextHalfSlot(config: BeaconConfig, chain: IBeaconChain, isFirstTi
 }
 
 function getHeadExecutionInfo(
+  forkChoice: IForkChoice,
   config: BeaconConfig,
   clockEpoch: Epoch,
   headState: IBeaconStateView,
@@ -167,13 +168,17 @@ function getHeadExecutionInfo(
     return [];
   }
 
-  // For Gloas PENDING/EMPTY heads, fork-choice stores the bid's parent_block_hash and the
-  // parent variant's block number on the head ProtoBlock, so the existing fields already
-  // describe the execution block the next block would build on. Render PayloadSeparated
-  // as "valid" because the parent anchor's payload must have been imported and validated
-  // before this block could be imported at all.
-  const executionStatusStr =
-    headInfo.executionStatus === ExecutionStatus.PayloadSeparated ? "valid" : headInfo.executionStatus.toLowerCase();
+  // For Gloas heads, render the status as the parent's payload status: "full" when the parent
+  // payload was revealed, "empty" when it was missed. head.parentBlockHash is the bid's
+  // parent_block_hash, which identifies the exact parent variant this block built on. Two
+  // consecutive logs with the same hash and "empty" label signal a string of missed payloads.
+  let executionStatusStr: string;
+  if (headInfo.parentBlockHash !== null) {
+    const parentVariant = forkChoice.getBlockHexAndBlockHash(headInfo.parentRoot, headInfo.parentBlockHash);
+    executionStatusStr = parentVariant?.payloadStatus === PayloadStatus.EMPTY ? "empty" : "full";
+  } else {
+    executionStatusStr = headInfo.executionStatus.toLowerCase();
+  }
 
   // Add execution status to notifier only if head is on/post bellatrix
   if (isStatePostBellatrix(headState) && headState.isExecutionStateType) {
