@@ -1,5 +1,5 @@
 import {BeaconConfig} from "@lodestar/config";
-import {ExecutionStatus, IForkChoice, PayloadStatus, ProtoBlock} from "@lodestar/fork-choice";
+import {ExecutionStatus, ProtoBlock} from "@lodestar/fork-choice";
 import {EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH} from "@lodestar/params";
 import {
   IBeaconStateView,
@@ -82,7 +82,7 @@ export async function runNodeNotifier(modules: NodeNotifierModules): Promise<voi
         skippedSlots > 0 ? (skippedSlots > 1000 ? `${headInfo.slot} ` : `(slot -${skippedSlots}) `) : "";
       const headRow = `head: ${headDiffInfo}${prettyBytes(headInfo.blockRoot)}`;
 
-      const executionInfo = getHeadExecutionInfo(chain.forkChoice, config, clockEpoch, headState, headInfo);
+      const executionInfo = getHeadExecutionInfo(config, clockEpoch, headState, headInfo);
       const finalizedCheckpointRow = `finalized: ${prettyBytes(finalizedRoot)}:${finalizedEpoch}`;
 
       let nodeState: string[];
@@ -158,7 +158,6 @@ function timeToNextHalfSlot(config: BeaconConfig, chain: IBeaconChain, isFirstTi
 }
 
 function getHeadExecutionInfo(
-  forkChoice: IForkChoice,
   config: BeaconConfig,
   clockEpoch: Epoch,
   headState: IBeaconStateView,
@@ -168,24 +167,13 @@ function getHeadExecutionInfo(
     return [];
   }
 
-  // Label preserves the pre-Gloas EL validation signal (valid/syncing). For Gloas non-FULL
-  // heads (PayloadSeparated), the exec-block shown is the parent's imported anchor, which is
-  // always validated by the time we log, so render as "valid".
+  // Keep the Gloas exec-block row operator-facing and shaped like pre-Gloas output.
+  // For imported Gloas heads the row already points at the inherited execution anchor via
+  // headInfo.executionPayloadBlockHash/Number; the internal PayloadSeparated status is not a
+  // user-facing execution verdict, so normalize it to "valid" instead of surfacing fork-choice
+  // bookkeeping in the log line.
   const executionStatusStr =
     headInfo.executionStatus === ExecutionStatus.PayloadSeparated ? "valid" : headInfo.executionStatus.toLowerCase();
-
-  // Gloas heads carry head.parentBlockHash (the bid's parent_block_hash). Look up the exact
-  // parent variant this head built on; if it was EMPTY, append "empty-parent" after the tuple.
-  // Two consecutive logs with the same hash and "empty-parent" signal a string of missed
-  // payloads, since a block extending an EMPTY parent inherits the grandparent's anchor as its
-  // bid.parent_block_hash.
-  let emptyParentSuffix = "";
-  if (headInfo.parentBlockHash !== null) {
-    const parentVariant = forkChoice.getBlockHexAndBlockHash(headInfo.parentRoot, headInfo.parentBlockHash);
-    if (parentVariant?.payloadStatus === PayloadStatus.EMPTY) {
-      emptyParentSuffix = " empty-parent";
-    }
-  }
 
   // Add execution status to notifier only if head is on/post bellatrix
   if (isStatePostBellatrix(headState) && headState.isExecutionStateType) {
@@ -197,10 +185,10 @@ function getHeadExecutionInfo(
       return [
         `exec-block: ${executionStatusStr}(${executionPayloadNumberInfo} ${prettyBytesShort(
           executionPayloadHashInfo
-        )})${emptyParentSuffix}`,
+        )})`,
       ];
     }
-    return [`exec-block: ${executionStatusStr}${emptyParentSuffix}`];
+    return [`exec-block: ${executionStatusStr}`];
   }
 
   return [];
