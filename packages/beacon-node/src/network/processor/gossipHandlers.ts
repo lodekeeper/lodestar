@@ -198,7 +198,10 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
     } catch (e) {
       if (e instanceof BlockGossipError) {
         logger.debug("Gossip block has error", {slot, root: blockShortHex, code: e.type.code});
-        if (e.type.code === BlockErrorCode.PARENT_UNKNOWN && blockInput) {
+        if (
+          (e.type.code === BlockErrorCode.PARENT_UNKNOWN || e.type.code === BlockErrorCode.PARENT_PAYLOAD_UNKNOWN) &&
+          blockInput
+        ) {
           chain.emitter.emit(ChainEvent.blockUnknownParent, {
             blockInput,
             peer: peerIdStr,
@@ -442,8 +445,8 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
     const payloadInput = chain.seenPayloadEnvelopeInputCache.get(blockRootHex);
 
     if (!payloadInput) {
-      // This should not happen for gossip because the network processor queues `data_column_sidecar`
-      // until block import creates the corresponding PayloadEnvelopeInput.
+      // This should not happen for gossip because the block should already be known by the time
+      // payload columns are processed.
       throw new DataColumnSidecarGossipError(GossipAction.IGNORE, {
         code: DataColumnSidecarErrorCode.PAYLOAD_ENVELOPE_INPUT_MISSING,
         slot,
@@ -1098,7 +1101,6 @@ function getSequentialHandlers(modules: ValidatorFnsModules, options: GossipHand
       const payloadInput = chain.seenPayloadEnvelopeInputCache.get(blockRootHex);
 
       if (!payloadInput) {
-        // This shouldn't happen because beacon block should have been imported and thus payload input should have been created.
         throw new ExecutionPayloadEnvelopeError(GossipAction.IGNORE, {
           code: ExecutionPayloadEnvelopeErrorCode.PAYLOAD_ENVELOPE_INPUT_MISSING,
           blockRoot: blockRootHex,

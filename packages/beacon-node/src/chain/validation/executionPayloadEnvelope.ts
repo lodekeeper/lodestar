@@ -48,8 +48,7 @@ async function validateExecutionPayloadEnvelope(
   // [IGNORE] The node has not seen another valid
   // `SignedExecutionPayloadEnvelope` for this block root from this builder.
   const envelopeBlock = chain.forkChoice.getBlockHex(blockRootHex, PayloadStatus.FULL);
-  const payloadInput = chain.seenPayloadEnvelopeInputCache.get(blockRootHex);
-  if (envelopeBlock || payloadInput?.hasPayloadEnvelope()) {
+  if (envelopeBlock) {
     throw new ExecutionPayloadEnvelopeError(GossipAction.IGNORE, {
       code: ExecutionPayloadEnvelopeErrorCode.ENVELOPE_ALREADY_KNOWN,
       blockRoot: blockRootHex,
@@ -57,11 +56,20 @@ async function validateExecutionPayloadEnvelope(
     });
   }
 
+  const payloadInput = chain.seenPayloadEnvelopeInputCache.get(blockRootHex);
   if (!payloadInput) {
-    // PayloadEnvelopeInput should have been created during block import
+    // importBlock() is the only place that creates PayloadEnvelopeInput for a known Gloas block.
     throw new ExecutionPayloadEnvelopeError(GossipAction.IGNORE, {
       code: ExecutionPayloadEnvelopeErrorCode.PAYLOAD_ENVELOPE_INPUT_MISSING,
       blockRoot: blockRootHex,
+    });
+  }
+
+  if (payloadInput.hasPayloadEnvelope()) {
+    throw new ExecutionPayloadEnvelopeError(GossipAction.IGNORE, {
+      code: ExecutionPayloadEnvelopeErrorCode.ENVELOPE_ALREADY_KNOWN,
+      blockRoot: blockRootHex,
+      slot: payload.slotNumber,
     });
   }
 
