@@ -80,13 +80,18 @@ export const defaultSkipOpts: SkipOpts = {
     // TODO-GLOAS: re-enable after Gloas light client is implemented
     /^gloas\/light_client\/.*/,
     /^gloas\/ssz_static\/LightClient(Bootstrap|FinalityUpdate|Header|OptimisticUpdate|Update)\/.*/,
+    // TODO: re-enable post-Deneb networking gossip suites once the gossip
+    // validation spec changes for Electra (EIP-7549 attestations), Fulu/Gloas
+    // (column sidecars, ePBS) are implemented in Lodestar.
+    /^electra\/networking\/.*/,
+    /^fulu\/networking\/.*/,
+    /^gloas\/networking\/.*/,
   ],
   skippedTests: [
     // TODO-GLOAS: re-enable after gloas light client is implemented
     /\/gloas_fork$/,
   ],
-  // TODO GLOAS: Investigate why networking tests are failing since alpha.5
-  skippedRunners: ["fast_confirmation", "networking"],
+  skippedRunners: ["fast_confirmation"],
 };
 
 /**
