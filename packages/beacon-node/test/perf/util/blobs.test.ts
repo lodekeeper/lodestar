@@ -17,17 +17,21 @@ describe("reconstructBlobs", () => {
     FULU_FORK_EPOCH: 0,
   });
 
-  const testCases = [
+  // KZG cell reconstruction is CPU-heavy and high-variance on the shared benchmark runner, so the
+  // larger blob counts trip the 3x regression gate with false positives and are slow to run. Only
+  // the smallest count runs on CI; the rest run locally, and the heaviest (48/72) require an
+  // explicit RUN_HEAVY_BENCHMARKS opt-in.
+  const testCases: {blobCount: number; name: string; skipCI?: boolean; heavy?: boolean}[] = [
     {blobCount: 6, name: "6 blobs"},
-    // Higher blob counts are disabled on CI: KZG cell reconstruction is CPU-heavy and has high
-    // run-to-run variance on the shared benchmark runner, which trips the 3x regression gate with
-    // false positives (the larger counts also take long to run). Kept enabled only for the
-    // smallest count; uncomment locally for fuller coverage.
-    // {blobCount: 10, name: "10 blobs"},
-    // {blobCount: 20, name: "20 blobs"},
-    // {blobCount: 48, name: "48 blobs"},
-    // {blobCount: 72, name: "72 blobs"},
-  ];
+    {blobCount: 10, name: "10 blobs", skipCI: true},
+    {blobCount: 20, name: "20 blobs", skipCI: true},
+    {blobCount: 48, name: "48 blobs", skipCI: true, heavy: true},
+    {blobCount: 72, name: "72 blobs", skipCI: true, heavy: true},
+  ].filter((tc) => {
+    if (process.env.CI && tc.skipCI) return false;
+    if (tc.heavy && !process.env.RUN_HEAVY_BENCHMARKS) return false;
+    return true;
+  });
 
   for (const {blobCount, name} of testCases) {
     describe(`Reconstruct blobs - ${name}`, () => {
