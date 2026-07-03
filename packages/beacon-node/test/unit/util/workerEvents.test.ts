@@ -55,4 +55,16 @@ describe("util / workerEvents / terminateWorkerThread", () => {
     expect(elapsed).toBeGreaterThanOrEqual(retryMs);
     expect(elapsed).toBeLessThan(retryMs * retryCount + 2000);
   });
+
+  it("returns false without throwing when Thread.terminate rejects", async () => {
+    // A rejecting terminate() (e.g. already-terminated / invalid worker) must be absorbed, not
+    // propagate out of the race and abort graceful shutdown.
+    subscribeMock.mockImplementation(() => {});
+    terminateMock.mockImplementation(async () => {
+      throw new Error("worker already terminated");
+    });
+
+    const result = await terminateWorkerThread({worker: {} as never, retryMs: 20, retryCount: 3});
+    expect(result).toBe(false);
+  });
 });

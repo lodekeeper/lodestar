@@ -138,16 +138,21 @@ export async function terminateWorkerThread({
     });
   });
 
+  // Initiate termination once, then race it (rather than awaiting) because it delegates to Node's
+  // `worker.terminate()`, which can hang forever when the worker is blocked inside a synchronous
+  // native (napi) call it can not preempt (V8 only tears down at a JS safepoint) — awaiting it
+  // directly would make the `retryCount * retryMs` budget unreachable and shutdown would hang.
+  // `.catch()` absorbs a rejection (e.g. an already-terminated / invalid worker) so it can not reject
+  // the race and abort graceful shutdown.
+  const terminatePromise = Thread.terminate(worker)
+    .then(() => true)
+    .catch((e) => {
+      logger?.warn("Thread.terminate rejected during shutdown", {error: String(e)});
+      return false;
+    });
+
   for (let i = 0; i < retryCount; i++) {
-    // `Thread.terminate` is part of the race (rather than awaited before it) because it delegates to
-    // Node's `worker.terminate()`, which can hang forever when the worker is blocked inside a
-    // synchronous native (napi) call it can not preempt (V8 only tears down at a JS safepoint). If it
-    // is awaited directly, the `retryCount * retryMs` budget is unreachable and shutdown hangs.
-    const result = await Promise.race([
-      terminated,
-      Thread.terminate(worker).then(() => true),
-      sleep(retryMs).then(() => false),
-    ]);
+    const result = await Promise.race([terminated, terminatePromise, sleep(retryMs).then(() => false)]);
 
     if (result) return true;
 
