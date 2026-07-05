@@ -118,13 +118,6 @@ export const SYNC_TOLERANCE_EPOCHS = 1;
  * TODO GLOAS: re-evaluate cutoff timing
  */
 const BLOCK_PRODUCTION_RACE_CUTOFF_MS = 2_000;
-/**
- * Overall timeout for execution and block production apis.
- * Uses slot duration (12s pre-EIP7782, 6s post-EIP7782).
- * Defined as a constant for pre-fork default; fork-aware value computed at call site.
- */
-const BLOCK_PRODUCTION_RACE_TIMEOUT_MS = 12_000;
-
 type ProduceBlockContentsRes = {executionPayloadValue: Wei; consensusBlockValue: Wei} & {
   data: BlockContents;
   version: ForkName;

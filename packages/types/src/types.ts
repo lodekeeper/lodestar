@@ -5,7 +5,6 @@ import {
   ForkPostBellatrix,
   ForkPostDeneb,
   ForkPostElectra,
-  ForkPostEip7782,
   ForkPostFulu,
   ForkPostGloas,
 } from "@lodestar/params";
@@ -14,7 +13,6 @@ import {ts as bellatrix} from "./bellatrix/index.js";
 import {ts as capella} from "./capella/index.js";
 import {ts as deneb} from "./deneb/index.js";
 import {ts as electra} from "./electra/index.js";
-import {ts as eip7782} from "./eip7782/index.js";
 import {ts as fulu} from "./fulu/index.js";
 import {ts as gloas} from "./gloas/index.js";
 import {ts as phase0} from "./phase0/index.js";
@@ -24,8 +22,8 @@ export {ts as altair} from "./altair/index.js";
 export {ts as bellatrix} from "./bellatrix/index.js";
 export {ts as capella} from "./capella/index.js";
 export {ts as deneb} from "./deneb/index.js";
-export {ts as electra} from "./electra/index.js";
 export {ts as eip7782} from "./eip7782/index.js";
+export {ts as electra} from "./electra/index.js";
 export {ts as fulu} from "./fulu/index.js";
 export {ts as gloas} from "./gloas/index.js";
 export {ts as phase0} from "./phase0/index.js";
