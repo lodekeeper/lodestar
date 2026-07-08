@@ -9,7 +9,7 @@ import {chainConfigFromJson, chainConfigTypes, createBeaconConfig} from "@lodest
 import {getConfig} from "@lodestar/config/test-utils";
 import {ExecutionStatus} from "@lodestar/fork-choice";
 import {testLogger} from "@lodestar/logger/test-utils";
-import {ForkName} from "@lodestar/params";
+import {ForkName, ForkPostGloas, ForkSeq, isForkPostGloas} from "@lodestar/params";
 import {
   BeaconStateAllForks,
   BeaconStateView,
@@ -26,6 +26,7 @@ import {
 import {RootHex, SignedBeaconBlock, ssz, sszTypesFor} from "@lodestar/types";
 import {fromHex, loadYaml, toHex, toRootHex} from "@lodestar/utils";
 import {BlockInputPreData, BlockInputSource} from "../../../src/chain/blocks/blockInput/index.js";
+import {PayloadEnvelopeInputSource} from "../../../src/chain/blocks/payloadEnvelopeInput/index.js";
 import {AttestationImportOpt, BlobSidecarValidation} from "../../../src/chain/blocks/types.js";
 import {GossipAction, GossipActionError} from "../../../src/chain/errors/gossipValidation.js";
 import {BeaconChain, ChainEvent} from "../../../src/chain/index.js";
@@ -35,6 +36,10 @@ import {GossipAttestation, validateGossipAttestationsSameAttData} from "../../..
 import {validateGossipAttesterSlashing} from "../../../src/chain/validation/attesterSlashing.js";
 import {validateGossipBlock} from "../../../src/chain/validation/block.js";
 import {validateGossipBlsToExecutionChange} from "../../../src/chain/validation/blsToExecutionChange.js";
+import {validateGossipExecutionPayloadBid} from "../../../src/chain/validation/executionPayloadBid.js";
+import {validateGossipExecutionPayloadEnvelope} from "../../../src/chain/validation/executionPayloadEnvelope.js";
+import {validateGossipPayloadAttestationMessage} from "../../../src/chain/validation/payloadAttestationMessage.js";
+import {validateGossipProposerPreferences} from "../../../src/chain/validation/proposerPreferences.js";
 import {validateGossipProposerSlashing} from "../../../src/chain/validation/proposerSlashing.js";
 import {validateGossipSyncCommittee} from "../../../src/chain/validation/syncCommittee.js";
 import {validateSyncCommitteeGossipContributionAndProof} from "../../../src/chain/validation/syncCommitteeContributionAndProof.js";
@@ -143,6 +148,7 @@ interface MetaYaml {
   current_time_ms?: bigint;
   messages: {
     offset_ms?: bigint;
+    current_time_ms?: bigint;
     subnet_id?: bigint;
     message: string;
     expected: "valid" | "ignore" | "reject";
@@ -160,7 +166,41 @@ const gossipTopicByHandler = {
   gossip_sync_committee_message: GossipType.sync_committee,
   gossip_sync_committee_contribution_and_proof: GossipType.sync_committee_contribution_and_proof,
   gossip_bls_to_execution_change: GossipType.bls_to_execution_change,
+  gossip_execution_payload_bid: GossipType.execution_payload_bid,
+  gossip_execution_payload_envelope: GossipType.execution_payload,
+  gossip_payload_attestation_message: GossipType.payload_attestation_message,
+  gossip_proposer_preferences: GossipType.proposer_preferences,
 } as const satisfies Record<string, GossipType>;
+
+/**
+ * A test-case's `messages` list may contain messages of DIFFERENT gossip topics than the
+ * test's primary `meta.topic` (e.g. an execution_payload_bid test seeds a proposer_preferences
+ * message and an execution_payload envelope message first). Derive each message's topic from
+ * its filename prefix so we deserialize + validate it against the correct topic.
+ */
+const messageTopicByPrefix: [string, GossipType][] = [
+  ["execution_payload_bid_", GossipType.execution_payload_bid],
+  ["execution_payload_envelope_", GossipType.execution_payload],
+  ["proposer_preferences_", GossipType.proposer_preferences],
+  ["payload_attestation_message_", GossipType.payload_attestation_message],
+  ["data_column_sidecar_", GossipType.data_column_sidecar],
+  ["single_attestation_", GossipType.beacon_attestation],
+  ["aggregate_", GossipType.beacon_aggregate_and_proof],
+  ["voluntary_exit_", GossipType.voluntary_exit],
+  ["proposer_slashing_", GossipType.proposer_slashing],
+  ["attester_slashing_", GossipType.attester_slashing],
+  ["sync_committee_message_", GossipType.sync_committee],
+  ["contribution_", GossipType.sync_committee_contribution_and_proof],
+  ["bls_to_execution_change_", GossipType.bls_to_execution_change],
+  ["block_", GossipType.beacon_block],
+];
+
+function getMessageTopic(messageName: string): GossipType {
+  for (const [prefix, topic] of messageTopicByPrefix) {
+    if (messageName.startsWith(prefix)) return topic;
+  }
+  throw Error(`Cannot derive gossip topic from message name ${messageName}`);
+}
 
 export function isGossipValidationHandler(topicHandler: string): topicHandler is keyof typeof gossipTopicByHandler {
   return topicHandler in gossipTopicByHandler;
@@ -433,7 +473,7 @@ export async function runGossipValidationTest(
     const rejectedFailedBlockRoots = new Set<RootHex>();
 
     if (meta.blocks) {
-      for (const [index, blockEntry] of meta.blocks.entries()) {
+      for (const blockEntry of meta.blocks) {
         const signedBlock = sszTypesFor(fork).SignedBeaconBlock.deserialize(
           loadSszSnappy(testCaseDir, blockEntry.block)
         );
@@ -441,19 +481,39 @@ export async function runGossipValidationTest(
         const blockRootHex = toHex(beaconConfig.getForkTypes(slot).BeaconBlock.hashTreeRoot(signedBlock.message));
         blockRootsByName.set(blockEntry.block, blockRootHex);
 
-        if (index === 0) {
-          // We assume the first block in meta.blocks is the anchor block whose post-state is
-          // the loaded anchor state. Assert this to avoid silently mis-seeding the state map.
+        // The anchor `state` is the post-state of the block at `anchorBlockSlot` (the head of the
+        // provided chain). `meta.blocks` lists the chain from genesis up to (and sometimes past)
+        // that head, so classify each block by slot rather than assuming blocks[0] is the anchor:
+        //   - slot  < anchorBlockSlot: an ancestor already baked into the anchor state. Record its
+        //     root (for finalized_checkpoint / failed-root resolution) but do not re-import it;
+        //     we only have the anchor state, so its post-state cannot be recomputed.
+        //   - slot == anchorBlockSlot: the anchor block. Seed its post-state = the anchor state.
+        //     Its payload-envelope input is already seeded from its bid in the BeaconChain ctor.
+        //   - slot  > anchorBlockSlot: a descendant to import into fork choice (logic below).
+        const anchorBlockSlot = anchorState.latestBlockHeader.slot;
+        if (slot < anchorBlockSlot) {
+          continue;
+        }
+        if (slot === anchorBlockSlot) {
           if (blockEntry.failed) {
-            throw new Error(`First block ${blockEntry.block} must not be marked as failed`);
-          }
-          if (slot !== anchorState.latestBlockHeader.slot) {
-            throw new Error(
-              `First block slot ${slot} does not match anchor state slot ${anchorState.latestBlockHeader.slot}`
-            );
+            throw new Error(`Anchor block ${blockEntry.block} at slot ${slot} must not be marked as failed`);
           }
           blockStatesByRoot.set(blockRootHex, anchorStateView);
           continue;
+        }
+
+        // Descendant block: mirror the gossip block handler (gossipHandlers.ts) and optimistically
+        // seed the payload-envelope input cache so envelope/data_column validation can find the
+        // PayloadEnvelopeInput created from this block's committed bid.
+        if (isForkPostGloas(fork)) {
+          chain.seenPayloadEnvelopeInputCache.add({
+            blockRootHex,
+            block: signedBlock as SignedBeaconBlock<ForkPostGloas>,
+            forkName: fork,
+            sampledColumns: chain.custodyConfig.sampledColumns,
+            custodyColumns: chain.custodyConfig.custodyColumns,
+            timeCreatedSec: 0,
+          });
         }
 
         const parentRootHex = toRootHex(signedBlock.message.parentRoot);
@@ -551,15 +611,23 @@ export async function runGossipValidationTest(
 
     const baseCurrentTimeMs = Number(meta.current_time_ms ?? 0);
     for (const message of meta.messages) {
-      const messageTimeMs = baseCurrentTimeMs + Number(message.offset_ms ?? 0);
+      // Newer fixtures give an absolute per-message `current_time_ms`; older ones give an
+      // `offset_ms` relative to the test-level `current_time_ms`. Support both.
+      const messageTimeMs =
+        message.current_time_ms != null
+          ? Number(message.current_time_ms)
+          : baseCurrentTimeMs + Number(message.offset_ms ?? 0);
       clock.setCurrentTimeMs(messageTimeMs);
+
+      // Dispatch each message against its own topic (may differ from the test's primary topic).
+      const messageTopic = getMessageTopic(message.message);
 
       let result: "valid" | "ignore" | "reject";
       try {
         await validateMessageForTopic(
           chain,
           fork,
-          topic,
+          messageTopic,
           testCaseDir,
           message,
           failedBlockRoots,
@@ -637,8 +705,12 @@ async function validateMessageForTopic(
     }
 
     case GossipType.beacon_attestation: {
-      const attestation = rejectOnInvalidSerializedBytes(() => sszTypesFor(fork).Attestation.deserialize(bytes));
-      const beaconBlockRootHex = toRootHex(attestation.data.beaconBlockRoot);
+      // Post-Electra gossip attestations are `SingleAttestation`, not the on-chain `Attestation`.
+      const beaconBlockRootHex = rejectOnInvalidSerializedBytes(() =>
+        ForkSeq[fork] >= ForkSeq.electra
+          ? toRootHex(sszTypesFor(fork).SingleAttestation.deserialize(bytes).data.beaconBlockRoot)
+          : toRootHex(sszTypesFor(fork).Attestation.deserialize(bytes).data.beaconBlockRoot)
+      );
 
       if (failedBlockRoots.has(beaconBlockRootHex)) {
         throw new GossipActionError(GossipAction.REJECT, {code: "SPEC_BLOCK_FAILED_VALIDATION"});
@@ -722,6 +794,51 @@ async function validateMessageForTopic(
       await validateGossipBlsToExecutionChange(chain, blsToExecutionChange);
       // Mirror gossip handler: insert into opPool so duplicate detection works
       chain.opPool.insertBlsToExecutionChange(blsToExecutionChange);
+      break;
+    }
+
+    case GossipType.proposer_preferences: {
+      const signedProposerPreferences = rejectOnInvalidSerializedBytes(() =>
+        ssz.gloas.SignedProposerPreferences.deserialize(bytes)
+      );
+      // Self-adds to chain.proposerPreferencesPool on success (needed by later bid messages).
+      await validateGossipProposerPreferences(chain, signedProposerPreferences);
+      break;
+    }
+
+    case GossipType.execution_payload_bid: {
+      const signedExecutionPayloadBid = rejectOnInvalidSerializedBytes(() =>
+        ssz.gloas.SignedExecutionPayloadBid.deserialize(bytes)
+      );
+      await validateGossipExecutionPayloadBid(chain, signedExecutionPayloadBid);
+      // Mirror gossip handler: store valid bid in the pool for "highest value" comparisons.
+      chain.executionPayloadBidPool.add(signedExecutionPayloadBid);
+      break;
+    }
+
+    case GossipType.execution_payload: {
+      const signedExecutionPayloadEnvelope = rejectOnInvalidSerializedBytes(() =>
+        ssz.gloas.SignedExecutionPayloadEnvelope.deserialize(bytes)
+      );
+      await validateGossipExecutionPayloadEnvelope(chain, signedExecutionPayloadEnvelope);
+      // Mirror gossip handler: record the envelope on its PayloadEnvelopeInput so duplicate
+      // detection ("envelope already known") works for later messages in the same test case.
+      const envelopeBlockRootHex = toRootHex(signedExecutionPayloadEnvelope.message.beaconBlockRoot);
+      chain.seenPayloadEnvelopeInputCache.get(envelopeBlockRootHex)?.addPayloadEnvelope({
+        envelope: signedExecutionPayloadEnvelope,
+        source: PayloadEnvelopeInputSource.gossip,
+        seenTimestampSec: 0,
+        peerIdStr: "spec-test",
+      });
+      break;
+    }
+
+    case GossipType.payload_attestation_message: {
+      const payloadAttestationMessage = rejectOnInvalidSerializedBytes(() =>
+        ssz.gloas.PayloadAttestationMessage.deserialize(bytes)
+      );
+      // Self-adds to chain.seenPayloadAttesters on success.
+      await validateGossipPayloadAttestationMessage(chain, payloadAttestationMessage);
       break;
     }
 

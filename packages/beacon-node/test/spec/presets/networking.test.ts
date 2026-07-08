@@ -7,7 +7,7 @@ import {bigIntToBytes, loadYaml} from "@lodestar/utils";
 import {computeColumnsForCustodyGroup, getCustodyGroups} from "../../../src/util/dataColumns.js";
 import {ethereumConsensusSpecsTests} from "../specTestVersioning.js";
 import {isGossipValidationHandler, runGossipValidationTest} from "../utils/gossipValidation.js";
-import {readdirSyncSpec, specTestIterator} from "../utils/specTestIterator.js";
+import {defaultSkipOpts, readdirSyncSpec, specTestIterator} from "../utils/specTestIterator.js";
 import {RunnerType, TestRunnerCustom} from "../utils/types.js";
 
 type ComputeColumnForCustodyGroupInput = {
@@ -59,7 +59,19 @@ function runNetworkingFnTests(testHandler: string, testSuite: string, testSuiteD
   }
 }
 
+// Handlers not yet wired into the gossip validation harness. Skipped (not silently passed) so
+// their presence in the reftest bundle is visible rather than throwing "No runner".
+//   - gossip_data_column_sidecar: gloas variant needs a PayloadEnvelopeInput + KZG wiring (WIP)
+//   - gossip_partial_data_column_sidecar: requires cell-level DAS support not yet in Lodestar
+const SKIPPED_GOSSIP_HANDLERS = new Set(["gossip_data_column_sidecar", "gossip_partial_data_column_sidecar"]);
+
 const networking: TestRunnerCustom = (fork, testHandler, testSuite, testSuiteDirpath) => {
+  if (SKIPPED_GOSSIP_HANDLERS.has(testHandler)) {
+    for (const testCaseName of readdirSyncSpec(testSuiteDirpath)) {
+      it.skip(testCaseName, () => {});
+    }
+    return;
+  }
   if (isGossipValidationHandler(testHandler)) {
     for (const testCaseName of readdirSyncSpec(testSuiteDirpath)) {
       const testCaseDir = path.join(testSuiteDirpath, testCaseName);
@@ -74,6 +86,11 @@ const networking: TestRunnerCustom = (fork, testHandler, testSuite, testSuiteDir
   }
 };
 
-specTestIterator(path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET), {
-  networking: {type: RunnerType.custom, fn: networking},
-});
+specTestIterator(
+  path.join(ethereumConsensusSpecsTests.outputDir, "tests", ACTIVE_PRESET),
+  {networking: {type: RunnerType.custom, fn: networking}},
+  // defaultSkipOpts skips the "networking" runner (it is owned by this file, not the main
+  // presets runner), so we must clear that skip here or no networking tests would run.
+  // Keep the fork skips (heze/eip7805) from defaultSkipOpts.
+  {...defaultSkipOpts, skippedRunners: []}
+);
