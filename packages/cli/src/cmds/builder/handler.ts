@@ -9,8 +9,6 @@ import {cleanOldLogFiles, onGracefulShutdown, parseLoggerArgs} from "../../util/
 import {loadBuilderKeypair} from "./loadKeypair.js";
 import {IBuilderCliArgs} from "./options.js";
 
-const KEEP_ALIVE_INTERVAL_MS = 60 * 1000;
-
 export async function builderHandler(args: IBuilderCliArgs & GlobalArgs): Promise<void> {
   const {config, network} = getBeaconConfigFromArgs(args);
 
@@ -45,23 +43,4 @@ export async function builderHandler(args: IBuilderCliArgs & GlobalArgs): Promis
   });
 
   onGracefulShutdownCbs.push(() => builder.close());
-
-  await waitForShutdown(abortController.signal);
-}
-
-export async function waitForShutdown(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const interval = setInterval(() => {}, KEEP_ALIVE_INTERVAL_MS);
-    const onAbort = (): void => {
-      clearInterval(interval);
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    };
-
-    if (signal.aborted) {
-      onAbort();
-    } else {
-      signal.addEventListener("abort", onAbort, {once: true});
-    }
-  });
 }
