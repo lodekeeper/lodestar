@@ -50,7 +50,7 @@ function getMinBidValue(currentHighestBid: number): number {
  * Building directly on the parent is allowed for proposer-boost reorgs outside epoch boundaries.
  * Otherwise the bid must build on the local head's full or empty payload variant, as selected for its slot.
  */
-function isBidCompatibleWithHead(
+export function isBidCompatibleWithHead(
   forkChoice: IForkChoice,
   head: ProtoBlock,
   bidSlot: Slot,
@@ -61,9 +61,10 @@ function isBidCompatibleWithHead(
   const buildsOnParentPayload = bidParentBlockHash === head.parentBlockHash;
 
   if (buildsOnParentBlock && buildsOnParentPayload) {
-    // The spec allows this at epoch boundaries, but Lodestar does not propagate these bids because validating
-    // them requires an epoch transition for a parent state that cannot be used for proposer-boost reorgs.
-    return !isStartSlotOfEpoch(bidSlot);
+    // Local policy deviation from the spec: Lodestar does not propagate parent-of-head
+    // proposer-boost reorg bids at epoch boundaries because validating them requires an
+    // epoch transition from the parent state, but Lodestar cannot select those bids locally.
+    return bidSlot >= head.slot && bidSlot <= head.slot + 1 && !isStartSlotOfEpoch(bidSlot);
   }
 
   if (bidParentBlockRoot !== head.blockRoot) {
