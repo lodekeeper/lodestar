@@ -4,7 +4,7 @@ import {MetricsRegisterExtra} from "@lodestar/utils";
 export type Metrics = ReturnType<typeof getMetrics>;
 
 export type LodestarGitData = {
-  /** "0.16.0 developer/feature-1 ac99f2b5" */
+  /** "0.16.0 developer/feature-1 4f816b16" */
   version: string;
   /** "4f816b16dfde718e2d74f95f2c8292596138c248" */
   commit: string;
@@ -25,7 +25,7 @@ export function getMetrics(register: MetricsRegisterExtra, gitData: LodestarGitD
 
   return {
     builderStatus: register.gauge({
-      name: "bc_status",
+      name: "bc_builder_status",
       help: "Current builder status: pending=0, active=1, exited=2",
     }),
 
