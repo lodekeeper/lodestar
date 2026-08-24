@@ -5,13 +5,6 @@ import {RegenCaller} from "../chain/regen/index.js";
 import {INetwork} from "../network/index.js";
 import {ClockEvent} from "../util/clock.js";
 
-type DeferredVoluntaryExitPublisherModules = {
-  chain: IBeaconChain;
-  network: INetwork;
-  logger: Logger;
-  signal: AbortSignal;
-};
-
 /**
  * On every epoch, drain the deferred voluntary exit pool and publish the exits that have become
  * processable. Lives at the node layer rather than inside `BeaconChain` because publishing needs
@@ -22,7 +15,12 @@ export function startDeferredVoluntaryExitPublisher({
   network,
   logger,
   signal,
-}: DeferredVoluntaryExitPublisherModules): void {
+}: {
+  chain: IBeaconChain;
+  network: INetwork;
+  logger: Logger;
+  signal: AbortSignal;
+}): void {
   const onEpoch = async (): Promise<void> => {
     try {
       const state = await chain.getHeadStateAtCurrentEpoch(RegenCaller.publishDeferredVoluntaryExits);
