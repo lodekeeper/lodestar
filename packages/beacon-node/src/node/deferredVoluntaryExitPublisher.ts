@@ -3,6 +3,7 @@ import {Logger} from "@lodestar/utils";
 import {IBeaconChain} from "../chain/index.js";
 import {RegenCaller} from "../chain/regen/index.js";
 import {INetwork} from "../network/index.js";
+import {IBeaconSync, SyncState} from "../sync/index.js";
 import {ClockEvent} from "../util/clock.js";
 
 /**
@@ -13,15 +14,23 @@ import {ClockEvent} from "../util/clock.js";
 export function startDeferredVoluntaryExitPublisher({
   chain,
   network,
+  sync,
   logger,
   signal,
 }: {
   chain: IBeaconChain;
   network: INetwork;
+  sync: IBeaconSync;
   logger: Logger;
   signal: AbortSignal;
 }): void {
   const onEpoch = async (): Promise<void> => {
+    // Only run once synced. getHeadStateAtCurrentEpoch regens the head forward to the current epoch;
+    // at init from a stale db-finalized state that can be many epoch transitions. The duties path,
+    // which calls the same regen, guards it behind a sync check too.
+    if (sync.state !== SyncState.Synced) {
+      return;
+    }
     try {
       const state = await chain.getHeadStateAtCurrentEpoch(RegenCaller.publishDeferredVoluntaryExits);
       const exits = chain.deferredVoluntaryExitPool.drainProcessableExits(state);
