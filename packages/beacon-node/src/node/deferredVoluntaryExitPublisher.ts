@@ -1,9 +1,7 @@
 import {routes} from "@lodestar/api";
 import {Logger} from "@lodestar/utils";
 import {IBeaconChain} from "../chain/index.js";
-import {RegenCaller} from "../chain/regen/index.js";
 import {INetwork} from "../network/index.js";
-import {IBeaconSync, SyncState} from "../sync/index.js";
 import {ClockEvent} from "../util/clock.js";
 
 /**
@@ -14,25 +12,21 @@ import {ClockEvent} from "../util/clock.js";
 export function startDeferredVoluntaryExitPublisher({
   chain,
   network,
-  sync,
   logger,
   signal,
 }: {
   chain: IBeaconChain;
   network: INetwork;
-  sync: IBeaconSync;
   logger: Logger;
   signal: AbortSignal;
 }): void {
   const onEpoch = async (): Promise<void> => {
-    // Only run once synced. getHeadStateAtCurrentEpoch regens the head forward to the current epoch;
-    // at init from a stale db-finalized state that can be many epoch transitions. The duties path,
-    // which calls the same regen, guards it behind a sync check too.
-    if (sync.state !== SyncState.Synced) {
-      return;
-    }
     try {
-      const state = await chain.getHeadStateAtCurrentEpoch(RegenCaller.publishDeferredVoluntaryExits);
+      // Use the cached head state directly rather than getHeadStateAtCurrentEpoch, which would regen
+      // the head forward to the current epoch. At init from a stale db-finalized state that regen can
+      // be many epoch transitions. The head state (at most ~1 epoch behind) is fine here: this is a
+      // best-effort drain that re-runs every epoch, so a just-processable exit is republished next tick.
+      const state = chain.getHeadState();
       const exits = chain.deferredVoluntaryExitPool.drainProcessableExits(state);
       for (const exit of exits) {
         try {

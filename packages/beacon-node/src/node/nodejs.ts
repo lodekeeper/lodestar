@@ -336,7 +336,7 @@ export class BeaconNode {
 
     void runNodeNotifier({network, chain, sync, config, logger, signal});
 
-    startDeferredVoluntaryExitPublisher({chain, network, sync, logger, signal});
+    startDeferredVoluntaryExitPublisher({chain, network, logger, signal});
 
     return new BeaconNode({
       opts,
