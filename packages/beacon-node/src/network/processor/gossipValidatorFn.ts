@@ -3,11 +3,14 @@ import {ChainForkConfig} from "@lodestar/config";
 import {Logger} from "@lodestar/utils";
 import {
   AttestationError,
+  AttestationErrorCode,
   BlsToExecutionChangeErrorCode,
   ExecutionPayloadBidErrorCode,
   GossipAction,
   GossipActionError,
+  PayloadAttestationErrorCode,
   ProposerPreferencesErrorCode,
+  SyncCommitteeErrorCode,
   VoluntaryExitErrorCode,
 } from "../../chain/errors/index.js";
 import {Metrics} from "../../metrics/index.js";
@@ -35,17 +38,35 @@ type RejectPeerActionRule = {default: PeerAction; byCode?: Record<string, PeerAc
 
 /**
  * PeerAction mapping based on the topic and specific codes.
+ *
+ * LowToleranceError is intentionally not PeerAction.Fatal. Even invalid signatures are
+ * handled through repeated-offense scoring, with cheaper op-pool topics left more tolerant.
  */
 const gossipRejectPeerAction: Record<GossipType, RejectPeerActionRule> = {
   [GossipType.beacon_block]: {default: PeerAction.LowToleranceError},
   [GossipType.blob_sidecar]: {default: PeerAction.LowToleranceError},
   [GossipType.data_column_sidecar]: {default: PeerAction.LowToleranceError},
   [GossipType.execution_payload]: {default: PeerAction.LowToleranceError},
-  [GossipType.beacon_aggregate_and_proof]: {default: PeerAction.MidToleranceError},
-  [GossipType.beacon_attestation]: {default: PeerAction.MidToleranceError},
-  [GossipType.sync_committee_contribution_and_proof]: {default: PeerAction.MidToleranceError},
-  [GossipType.sync_committee]: {default: PeerAction.MidToleranceError},
-  [GossipType.payload_attestation_message]: {default: PeerAction.MidToleranceError},
+  [GossipType.beacon_aggregate_and_proof]: {
+    default: PeerAction.MidToleranceError,
+    byCode: {[AttestationErrorCode.INVALID_SIGNATURE]: PeerAction.LowToleranceError},
+  },
+  [GossipType.beacon_attestation]: {
+    default: PeerAction.MidToleranceError,
+    byCode: {[AttestationErrorCode.INVALID_SIGNATURE]: PeerAction.LowToleranceError},
+  },
+  [GossipType.sync_committee_contribution_and_proof]: {
+    default: PeerAction.MidToleranceError,
+    byCode: {[SyncCommitteeErrorCode.INVALID_SIGNATURE]: PeerAction.LowToleranceError},
+  },
+  [GossipType.sync_committee]: {
+    default: PeerAction.MidToleranceError,
+    byCode: {[SyncCommitteeErrorCode.INVALID_SIGNATURE]: PeerAction.LowToleranceError},
+  },
+  [GossipType.payload_attestation_message]: {
+    default: PeerAction.MidToleranceError,
+    byCode: {[PayloadAttestationErrorCode.INVALID_SIGNATURE]: PeerAction.LowToleranceError},
+  },
   [GossipType.execution_payload_bid]: {
     default: PeerAction.HighToleranceError,
     byCode: {[ExecutionPayloadBidErrorCode.INVALID_SIGNATURE]: PeerAction.MidToleranceError},
