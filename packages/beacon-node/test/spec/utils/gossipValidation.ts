@@ -141,9 +141,8 @@ interface MetaYaml {
   topic: GossipType;
   blocks?: {block: string; failed?: boolean; payload_status?: MetaPayloadStatus}[];
   finalized_checkpoint?: {epoch: bigint; root?: string; block?: string};
-  current_time_ms?: bigint;
   messages: {
-    offset_ms?: bigint;
+    current_time_ms?: bigint;
     subnet_id?: bigint;
     message: string;
     expected: "valid" | "ignore" | "reject";
@@ -550,9 +549,8 @@ export async function runGossipValidationTest(
         })
     );
 
-    const baseCurrentTimeMs = Number(meta.current_time_ms ?? 0);
     for (const message of meta.messages) {
-      const messageTimeMs = baseCurrentTimeMs + Number(message.offset_ms ?? 0);
+      const messageTimeMs = Number(message.current_time_ms ?? 0);
       clock.setCurrentTimeMs(messageTimeMs);
 
       let result: "valid" | "ignore" | "reject";
