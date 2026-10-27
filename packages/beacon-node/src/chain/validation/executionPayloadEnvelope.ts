@@ -6,6 +6,8 @@ import {
 } from "@lodestar/state-transition";
 import {gloas, ssz} from "@lodestar/types";
 import {byteArrayEquals, toRootHex} from "@lodestar/utils";
+import {serializeExecutionRequestsToBytes} from "../../execution/engine/types.js";
+import {computeExecutionBlockHash} from "../../util/executionBlockHash.js";
 import {ExecutionPayloadEnvelopeError, ExecutionPayloadEnvelopeErrorCode, GossipAction} from "../errors/index.js";
 import {IBeaconChain} from "../index.js";
 import {RegenCaller} from "../regen/index.js";
@@ -120,6 +122,22 @@ async function validateExecutionPayloadEnvelope(
       root: blockRootHex,
       envelopeRequestsRoot: toRootHex(requestsRoot),
       bidRequestsRoot: toRootHex(payloadInput.getBid().executionRequestsRoot),
+    });
+  }
+
+  // [REJECT] `payload.block_hash` is computed correctly as verified by `is_valid_block_hash`
+  const computedBlockHash = computeExecutionBlockHash(
+    payload,
+    envelope.parentBeaconBlockRoot,
+    serializeExecutionRequestsToBytes(chain.config.getForkName(payload.slotNumber), envelope.executionRequests)
+  );
+  if (!byteArrayEquals(computedBlockHash, payload.blockHash)) {
+    throw new ExecutionPayloadEnvelopeError(GossipAction.REJECT, {
+      code: ExecutionPayloadEnvelopeErrorCode.INVALID_BLOCK_HASH,
+      slot: payload.slotNumber,
+      root: blockRootHex,
+      blockHash: toRootHex(payload.blockHash),
+      computedBlockHash: toRootHex(computedBlockHash),
     });
   }
 
