@@ -19,7 +19,7 @@ env:
 jobs:
   test:
     name: Build and run Kurtosis builder setup
-    runs-on: warp-ubuntu-2204-x64-4x
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

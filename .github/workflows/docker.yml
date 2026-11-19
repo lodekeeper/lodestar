@@ -31,7 +31,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runner: warp-ubuntu-2204-x64-4x
+            runner: ubuntu-latest
           - arch: arm64
             runner: warp-ubuntu-latest-arm64-4x
     steps:
