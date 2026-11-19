@@ -13,6 +13,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      zig: ${{ steps.scope.outputs.run_zig }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Detect changed scope
+        id: scope
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run_zig=true" >> "$GITHUB_OUTPUT"
+          elif ! git diff --name-only HEAD^1 HEAD | .github/workflows/scripts/ci_changed_scope.sh >> "$GITHUB_OUTPUT"; then
+            echo "run_zig=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build
     runs-on: warp-ubuntu-2204-x64-4x
@@ -351,6 +370,8 @@ jobs:
 
   zig-build-test:
     name: Zig build and tests (${{ matrix.os }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.zig != 'false' }}
     strategy:
       fail-fast: false
       matrix:
@@ -462,6 +483,8 @@ jobs:
 
   zig-build-test-slow:
     name: Zig integration tests
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.zig != 'false' }}
     # It takes time to download and run these tests, so we only run them on ubuntu-latest
     runs-on: ubuntu-latest
     steps:
@@ -485,6 +508,8 @@ jobs:
 
   zig-spec-test-prep:
     name: Zig spec preparation
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.zig != 'false' }}
     runs-on: ubuntu-latest
     outputs:
       spec-test-version: ${{ steps.spec-test-version.outputs.version }}
@@ -656,6 +681,8 @@ jobs:
 
   zig-build-fuzz:
     name: Zig fuzz build
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.zig != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -687,6 +714,8 @@ jobs:
 
   bindings-artifacts:
     name: Native platform builds
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.zig != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
