@@ -10,6 +10,7 @@ while IFS= read -r file; do
   [ -n "$file" ] || continue
   count=$((count + 1))
   case "$file" in
+    *.zig | *.zig.zon) run_zig=true ;;
     packages/* | types/* | configs/* | docs/* | dashboards/* | specrefs/*) ;;
     vitest.config.ts | tsconfig*.json | lerna.json | spec-tests-version.json) ;;
     .wordlist.txt | .pyspelling.yml | .benchrc.yaml | .codecov.yml | default.env | .env.test) ;;
