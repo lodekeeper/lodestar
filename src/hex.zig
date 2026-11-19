@@ -1,4 +1,4 @@
-// CI scope test (fork only)
+// CI scope test (fork only), v2
 const std = @import("std");
 const fmt = std.fmt;
 
